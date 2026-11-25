@@ -1,0 +1,360 @@
+# UI-Pro Default Policy Pack
+# 产品自带通用规范：仅使用跨品类 UI 语义，禁止品类硬编码条件。
+# pack_id: default
+# version: 1.0.0
+
+pack:
+  id: default
+  version: 1.0.0
+  title: UI-Pro Universal Default Policies
+  universal: true
+  description: >
+    适用于任意游戏品类与美术风格的默认切分/结构/文本/命名/交互槽位规范。
+    项目可通过 policy/project.yaml 覆盖、禁用或提高 salience。
+
+# ---------------------------------------------------------------------------
+# Meta principles are enforced by the engine (not toggleable as business rules)
+# ---------------------------------------------------------------------------
+# 1. Structural decisions must cite a policy id
+# 2. Same when-match => same then (unless node exception)
+# 3. User corrections default to policy proposals
+# 4. This pack must stay genre-agnostic
+# 5. Scope priority: exception > screen > project > default
+
+rules:
+
+  # ========== Slicing ==========
+
+  - id: badge.notification.independent_slice
+    version: 1
+    salience: 100
+    enabled: true
+    category: slicing
+    title: 通知类角标独立切图
+    description: >
+      红点、感叹号、New 点等通知角标不得烘焙进父控件，
+      必须作为独立 Badge 节点并附着在父节点上。
+    when:
+      all:
+        - type: Badge
+        - semantics.role: notification
+    then:
+      slicing: independent
+      attach:
+        anchor: top_right
+        offset: { x: -8, y: 8 }
+      export:
+        sprite: separate
+      naming:
+        pattern: "badge_{parent_id}_notify"
+
+  - id: badge.enhancement.as_child
+    version: 1
+    salience: 90
+    enabled: true
+    category: slicing
+    title: 强化/等级类角标为子节点
+    description: >
+      +N、等级角标等增强标记默认作为父槽位/图标的子节点独立切图，
+      而非烙进主图标（便于换数与换皮）。
+    when:
+      all:
+        - type: Badge
+        - semantics.role: enhancement
+    then:
+      slicing: independent
+      attach:
+        anchor: bottom_right
+        offset: { x: -4, y: -4 }
+      export:
+        sprite: separate
+      naming:
+        pattern: "badge_{parent_id}_enh"
+
+  - id: button.plus.separate
+    version: 1
+    salience: 95
+    enabled: true
+    category: slicing
+    title: 加号操作钮独立
+    description: >
+      出现在复合展示控件内的「+」操作按钮，始终独立为 Button，
+      不与数值条或图标烘焙在一起。
+    when:
+      all:
+        - type: Button
+        - semantics.role: add_action
+    then:
+      slicing: independent
+      interactive: true
+      naming:
+        pattern: "btn_{parent_id}_add"
+
+  - id: currency.plus_separate
+    version: 1
+    salience: 96
+    enabled: true
+    category: structure
+    title: 货币条拆为复合结构
+    description: >
+      货币展示识别为 CurrencyDisplay：图标 + 数值文本 + 可选 add_action 按钮。
+    when:
+      all:
+        - type: CurrencyDisplay
+    then:
+      structure:
+        children:
+          - { role: icon, type: Image }
+          - { role: value, type: Text, text.kind: numeric }
+          - { role: add, type: Button, semantics.role: add_action, optional: true }
+
+  - id: decor.merge_noninteractive
+    version: 1
+    salience: 40
+    enabled: true
+    category: slicing
+    title: 非交互装饰可合并
+    description: >
+      无命中语义、无交互、且被判定为背景装饰的图层，允许合并为一张装饰底图，
+      以降低切图碎片。不得合并任何 interactive 或 Badge/Slot/Button。
+    when:
+      all:
+        - interactive: false
+        - semantics.role: decoration
+    then:
+      slicing: merge_allowed
+      interactive: false
+
+  - id: avatar.keep_intact
+    version: 1
+    salience: 80
+    enabled: true
+    category: slicing
+    title: 展示位主体整切
+    description: >
+      Avatar/主展示立绘默认整块独立切图，不与底座、光效强制合并；
+      底座与特效可为同组兄弟节点。
+    when:
+      all:
+        - type: Avatar
+    then:
+      slicing: independent
+      keep_alpha: true
+
+  - id: button.nineslice_candidate
+    version: 1
+    salience: 70
+    enabled: true
+    category: slicing
+    title: 大尺寸按钮尝试九宫
+    description: >
+      宽或高超过阈值、边缘对称的 Button，标记九宫候选，导出时生成 border。
+    when:
+      all:
+        - type: Button
+        - visual.traits: has_nine_slice_candidate
+    then:
+      nine_slice: auto
+      export:
+        nine_slice: true
+
+  # ========== Structure / Patterns ==========
+
+  - id: pattern.grid_equal_cells
+    version: 1
+    salience: 85
+    enabled: true
+    category: structure
+    title: 等距网格识别为同一模式
+    description: >
+      几何上近似等宽等高、间距稳定的同类单元格，归入同一 pattern/group，
+      后续规范与行为可批量作用。
+    when:
+      all:
+        - pattern.kind: grid
+    then:
+      structure:
+        group_as: pattern
+        propagate_policy: true
+      naming:
+        group_pattern: "grid_{index}"
+
+  - id: pattern.list_rows
+    version: 1
+    salience: 85
+    enabled: true
+    category: structure
+    title: 重复行识别为列表
+    description: >
+      垂直重复、结构相似的行识别为 List + ListItem，行内子结构应对齐。
+    when:
+      all:
+        - pattern.kind: list
+    then:
+      structure:
+        container: List
+        item: ListItem
+        propagate_policy: true
+
+  - id: tabs.mutex_structure
+    version: 1
+    salience: 88
+    enabled: true
+    category: structure
+    title: 页签互斥结构
+    description: >
+      Tab 集合必须归属同一 TabBar，并关联 Panel；选中态由状态表达，
+      默认不按「每个选中态整页重切」。
+    when:
+      all:
+        - type: TabBar
+    then:
+      structure:
+        mutex: true
+        state_driven_active: true
+      slicing:
+        shared_frame: true
+
+  - id: slot.empty_filled_states
+    version: 1
+    salience: 75
+    enabled: true
+    category: interaction_default
+    title: 槽位预留空/满状态
+    description: >
+      Slot 节点预留 empty / filled 视觉槽，便于运行时换内容而不重切父级。
+    when:
+      all:
+        - type: Slot
+    then:
+      states:
+        - empty
+        - filled
+      slicing:
+        frame_independent: true
+
+  - id: button.pressed_state_slot
+    version: 1
+    salience: 60
+    enabled: true
+    category: interaction_default
+    title: 按钮预留按下态槽位
+    description: >
+      Button 在 UIR 中预留 pressed（及可选 disabled）状态槽；
+      若素材仅有一张，标记 missing_state 而不杜撰切图。
+    when:
+      all:
+        - type: Button
+    then:
+      states:
+        - normal
+        - pressed
+        - disabled
+      missing_state: placeholder
+
+  # ========== Text ==========
+
+  - id: text.numeric.dynamic
+    version: 1
+    salience: 90
+    enabled: true
+    category: text
+    title: 纯数字动态文本化
+    description: >
+      识别为纯数字（含千分位）的区域默认转为 Text，切图挖空或透明占位。
+    when:
+      all:
+        - type: Text
+        - text.kind: numeric
+    then:
+      text:
+        mode: dynamic
+        preserve_style_token: true
+      slicing:
+        knockout: true
+
+  - id: text.art.keep_bitmap
+    version: 1
+    salience: 90
+    enabled: true
+    category: text
+    title: 艺术字保留位图
+    description: >
+      艺术字/特效标题默认不转 Text，保留位图以保证保真。
+    when:
+      all:
+        - text.kind: art
+    then:
+      text:
+        mode: bitmap
+      slicing: independent
+
+  - id: text.label.prefer_dynamic
+    version: 1
+    salience: 50
+    enabled: true
+    category: text
+    title: 短标签可动态化
+    description: >
+      短文案标签默认允许动态 Text（项目可改回 bitmap）。
+    when:
+      all:
+        - type: Text
+        - text.kind: label
+        - text.length.lte: 8
+    then:
+      text:
+        mode: dynamic
+
+  # ========== Naming ==========
+
+  - id: naming.stable_ids
+    version: 1
+    salience: 30
+    enabled: true
+    category: naming
+    title: 稳定可读 ID
+    description: >
+      节点 id 使用 type 前缀 + 语义 role + 可选序号，避免随机 hash 作为主 id。
+    when:
+      all:
+        - id.exists: true
+    then:
+      naming:
+        id_pattern: "{type_short}_{role}_{index?}"
+        forbid: ["random_uuid_primary"]
+
+  # ========== Hit testing ==========
+
+  - id: button.hitarea_from_shape
+    version: 1
+    salience: 55
+    enabled: true
+    category: structure
+    title: 按钮点击区来自可见形状
+    description: >
+      Button 的 hitArea 默认取可见圆角矩形/圆形的外接扩展，禁止无必要扩大至整行。
+    when:
+      all:
+        - type: Button
+    then:
+      hitArea:
+        from: visible_bounds
+        padding: 4
+
+  # ========== Export hygiene ==========
+
+  - id: export.no_policy_no_go
+    version: 1
+    salience: 1000
+    enabled: true
+    category: export
+    title: 无溯源不得导出结构性节点
+    description: >
+      凡含 slicing/structure 决策的节点必须带 decidedBy；否则 validate 失败。
+    when:
+      all:
+        - visual.sliceMode.exists: true
+    then:
+      require:
+        decidedBy: non_empty

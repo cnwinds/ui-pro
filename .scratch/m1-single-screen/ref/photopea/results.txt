@@ -1,0 +1,56 @@
+=== run-blend-mode.log
+photopea ready in 23 ms
+psd opened in 83 ms
+doc 300 x 200 layers: 0:ArtLayer:??è:v
+full export 103 ms
+photopea full render vs Photoshop composite: meanAbs 2.174 max 255 channels>16: 6615 of 240000
+per-layer recomposite vs Photoshop composite: meanAbs 2.173 max 255 channels>16: 6614 of 240000
+=== run-fill-opacity.log
+photopea ready in 19 ms
+psd opened in 73 ms
+doc 1 x 1 layers: 0:ArtLayer:[#f00] Fill opacity 20% (non-TS Linear light mode):v | 1:ArtLayer:[#0f0] Normal opacity 40% (TS Linear light mode):v | 2:ArtLayer:[#00f] Normal opacity 60% (Normal mode):v
+full export 54 ms
+photopea full render vs Photoshop composite: meanAbs 16.500 max 38 channels>16: 1 of 4
+per-layer recomposite vs Photoshop composite: meanAbs 11.750 max 24 channels>16: 2 of 4
+=== run-gradient-overlay-2.log
+photopea ready in 19 ms
+psd opened in 132 ms
+doc 1200 x 1200 layers: 0:ArtLayer:Gradient Map 1:v | 1:ArtLayer:Color Fill 1:v
+full export 103 ms
+photopea full render vs Photoshop composite: meanAbs 7.000 max 18 channels>16: 1440000 of 5760000
+per-layer recomposite vs Photoshop composite: meanAbs 9.000 max 13 channels>16: 0 of 5760000
+=== run-group-drop-shadows.log
+photopea ready in 22 ms
+psd opened in 849 ms
+doc 1000 x 1000 layers: 0:LayerSet:Group 1:v | 0.0:ArtLayer:Ellipse 1:v | 0.1:ArtLayer:Rectangle 1:v | 1:ArtLayer:Background:v
+full export 158 ms
+photopea full render vs Photoshop composite: meanAbs 0.121 max 45 channels>16: 2190 of 4000000
+per-layer recomposite vs Photoshop composite: meanAbs 0.125 max 5 channels>16: 0 of 4000000
+=== run-layer-mask.log
+photopea ready in 22 ms
+psd opened in 79 ms
+doc 200 x 200 layers: 0:ArtLayer:Layer 1:v
+full export 102 ms
+photopea full render vs Photoshop composite: meanAbs 0.191 max 126 channels>16: 398 of 160000
+per-layer recomposite vs Photoshop composite: meanAbs 0.191 max 126 channels>16: 398 of 160000
+=== run-smart-object.log
+photopea ready in 21 ms
+psd opened in 92 ms
+doc 300 x 300 layers: 0:ArtLayer:kitty:v | 1:ArtLayer:picture:v
+full export 206 ms
+photopea full render vs Photoshop composite: meanAbs 0.000 max 0 channels>16: 0 of 360000
+per-layer recomposite vs Photoshop composite: meanAbs 0.000 max 0 channels>16: 0 of 360000
+=== run-text-simple.log
+photopea ready in 19 ms
+psd opened in 1376 ms
+doc 200 x 100 layers: 0:ArtLayer:Hello:v
+full export 52 ms
+photopea full render vs Photoshop composite: meanAbs 0.039 max 7 channels>16: 0 of 80000
+per-layer recomposite vs Photoshop composite: meanAbs 0.039 max 7 channels>16: 0 of 80000
+=== run.log
+photopea ready in 20 ms
+psd opened in 80 ms
+doc 200 x 200 layers: 0:ArtLayer:solid fill:v | 1:ArtLayer:bevel:v | 2:ArtLayer:inner outer glow:v | 3:ArtLayer:inner shadow:v | 4:ArtLayer:drop shadow:v | 5:ArtLayer:other:v | 6:ArtLayer:other2:v
+full export 104 ms
+photopea full render vs Photoshop composite: meanAbs 3.847 max 255 channels>16: 7125 of 160000
+per-layer recomposite vs Photoshop composite: meanAbs 3.846 max 255 channels>16: 7118 of 160000

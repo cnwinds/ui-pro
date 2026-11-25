@@ -730,7 +730,7 @@ M0 用美术提供的真实 PSD 比较 Photopea 和 Aspose.PSD，按核对通过
 
 ### 9.2 由引擎内的构建器生成
 
-`ui-pro export godot --project <路径>` 分四步执行：
+`ui-pro export godot --to <Godot 工程路径>` 分四步执行（`--project` 是全局选项，指 UI-Pro 项目目录）：
 
 1. 把切图、字体、音频写入 Godot 工程目录。
 2. 以无界面方式运行 `godot --headless --path <工程> --import`，让引擎导入它们。

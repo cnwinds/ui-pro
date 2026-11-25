@@ -1,0 +1,15 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://ui.png" id="1_a1yq3"]
+
+[node name="Probe" type="Control" unique_id=240942862]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 438.0
+offset_bottom = 652.0
+
+[node name="Bg" type="TextureRect" parent="." unique_id=731341590]
+unique_name_in_owner = true
+layout_mode = 0
+texture = ExtResource("1_a1yq3")
+metadata/ui_pro_id = "bg"

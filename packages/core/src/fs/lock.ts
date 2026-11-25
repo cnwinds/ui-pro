@@ -40,13 +40,16 @@ async function readPayload(lockFile: string): Promise<LockPayload | null> {
 
 type LockState = 'gone' | 'stale' | 'held';
 
-/** Who owns an existing lock file: nobody anymore, a dead or long-gone writer, or a live one. */
+/**
+ * Who owns an existing lock file: nobody anymore, a dead writer, or a live one. A live owner keeps
+ * its lock however long it runs (builds wait on cloud models); age only judges unreadable locks.
+ */
 async function inspectLock(lockFile: string): Promise<LockState> {
   try {
     const ageMs = Date.now() - (await stat(lockFile)).mtimeMs;
-    if (ageMs > STALE_AFTER_MS) return 'stale';
     const payload = await readPayload(lockFile);
-    return payload !== null && !isProcessAlive(payload.pid) ? 'stale' : 'held';
+    if (payload === null) return ageMs > STALE_AFTER_MS ? 'stale' : 'held';
+    return isProcessAlive(payload.pid) ? 'held' : 'stale';
   } catch (error) {
     if (isNodeError(error) && error.code === 'ENOENT') return 'gone';
     throw ioError('检查锁文件', lockFile, error);
@@ -75,8 +78,8 @@ async function release(lockFile: string, token: string): Promise<void> {
 
 /**
  * Runs `fn` while holding the project's exclusive write lock (`.ui-pro/lock`). Fails fast with
- * `E_LOCKED` when another live writer holds it; a lock older than 10 minutes or owned by a dead
- * process is broken. Breaking a stale lock is not atomic against a second breaker, which is
+ * `E_LOCKED` when another live writer holds it; a lock owned by a dead process, or an unreadable
+ * one older than 10 minutes, is broken. Breaking a stale lock is not atomic against a second breaker, which is
  * acceptable for the single-user, few-writers setting this tool targets.
  */
 export async function withProjectLock<T>(root: string, fn: () => Promise<T>): Promise<T> {
@@ -98,7 +101,7 @@ export async function withProjectLock<T>(root: string, fn: () => Promise<T>): Pr
   if (!acquired) {
     const holder = await readPayload(lockFile);
     const shown = toPosix(lockFile);
-    throw new UiProError(ErrorCodes.locked, '工程正被另一个写入者占用', {
+    throw new UiProError(ErrorCodes.locked, '项目正被另一个写入者占用', {
       hint: `等待其完成后重试；确认没有 ui-pro 进程在运行时，可删除 ${shown}`,
       details: { lockFile: shown, holderPid: holder?.pid ?? null },
     });

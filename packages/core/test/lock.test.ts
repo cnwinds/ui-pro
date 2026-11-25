@@ -75,13 +75,14 @@ describe('project lock', () => {
     expect(existsSync(join(project.root, '.ui-pro', 'lock'))).toBe(false);
   });
 
-  it('breaks a lock older than ten minutes even if its owner looks alive', async () => {
+  it('keeps a lock of a live owner however old it is', async () => {
     const { project, screen } = await emptyScreenProject(makeDir);
-    await writeLock(project.root, lockPayload(process.pid), 11 * 60 * 1000);
+    const lockFile = await writeLock(project.root, lockPayload(process.pid), 60 * 60 * 1000);
 
-    await applyOps(project, [addNode('extra')], { screen });
+    const error = await failureOf(applyOps(project, [addNode('extra')], { screen }));
 
-    expect(loadScreen(project, screen).nodes.extra).toBeDefined();
+    expect(error.code).toBe(ErrorCodes.locked);
+    expect(await readFile(lockFile, 'utf8')).toContain('foreign');
   });
 
   it('respects a fresh lock of a live process', async () => {

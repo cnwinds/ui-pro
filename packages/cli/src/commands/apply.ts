@@ -64,7 +64,7 @@ export const applyCommand: CommandModule = {
   register(program, host) {
     program
       .command('apply')
-      .description('把一批操作作为一个事务应用到工程（全部成功或全部不生效）')
+      .description('把一批操作作为一个事务应用到项目（全部成功或全部不生效）')
       .argument('<file>', '操作文件（JSON）；- 表示从标准输入读取')
       .option('--dry-run', '只检查和预演，不写入任何文件')
       .option('--message <text>', '历史版本的说明')

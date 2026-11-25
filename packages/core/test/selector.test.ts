@@ -60,14 +60,14 @@ describe('parseSelector', () => {
   });
 
   it('parses quoted attribute values, including escapes', () => {
-    expect(tests('[label="a b"]')).toEqual([
-      { kind: 'attribute', name: 'label', operator: '=', value: 'a b' },
+    expect(tests('[text="a b"]')).toEqual([
+      { kind: 'attribute', name: 'text', operator: '=', value: 'a b' },
     ]);
-    expect(tests("[label='it\\'s']")).toEqual([
-      { kind: 'attribute', name: 'label', operator: '=', value: "it's" },
+    expect(tests("[text='it\\'s']")).toEqual([
+      { kind: 'attribute', name: 'text', operator: '=', value: "it's" },
     ]);
-    expect(tests('[label="a]b"]')).toEqual([
-      { kind: 'attribute', name: 'label', operator: '=', value: 'a]b' },
+    expect(tests('[text="a]b"]')).toEqual([
+      { kind: 'attribute', name: 'text', operator: '=', value: 'a]b' },
     ]);
   });
 
@@ -220,7 +220,12 @@ const MAIN = buildScreen('main', [
     parent: 'btn_mail',
     extra: { role: 'badge.notification', concept: '红点', cluster: 'dot' },
   },
-  { id: 'title', type: 'text', parent: 'root', extra: { label: 'foo bar', visible: false } },
+  {
+    id: 'title',
+    type: 'text',
+    parent: 'root',
+    extra: { text: { content: 'foo bar' }, visible: false },
+  },
   { id: 'panel', type: 'container', parent: 'root' },
   {
     id: 'btn_buy',
@@ -286,9 +291,10 @@ describe('resolveSelector', () => {
     expect(find('[role]')).toEqual(['main/#btn_shop', 'main/#btn_mail', 'main/#badge_mail']);
     expect(find('[varies~=state]')).toEqual(['main/#btn_buy']);
     expect(find('[varies]')).toEqual(['main/#btn_buy']);
-    expect(find('[label~=bar]')).toEqual(['main/#title']);
-    expect(find('[label~=ba]')).toEqual([]);
-    expect(find('[label="foo bar"]')).toEqual(['main/#title']);
+    expect(find('[text~=bar]')).toEqual(['main/#title']);
+    expect(find('[text~=ba]')).toEqual([]);
+    expect(find('[text="foo bar"]')).toEqual(['main/#title']);
+    expect(find('[text]')).toEqual(['main/#title']);
   });
 
   it('matches the structural attributes', () => {

@@ -12,7 +12,7 @@ export function resolveInside(root: string, relPath: string): string {
   const fromRoot = relative(root, absolute);
   const escapes = fromRoot === '..' || fromRoot.startsWith(`..${sep}`) || isAbsolute(fromRoot);
   if (fromRoot === '' || escapes) {
-    throw new UiProError(ErrorCodes.invariant, `路径越出工程目录：${relPath}`);
+    throw new UiProError(ErrorCodes.invariant, `路径越出项目目录：${relPath}`);
   }
   return absolute;
 }

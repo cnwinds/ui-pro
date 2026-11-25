@@ -18,7 +18,6 @@ const NodeSetSchema = z
     type: PrimitiveSchema.optional(),
     role: RoleSchema.nullable().optional(),
     concept: ConceptNameSchema.nullable().optional(),
-    label: z.string().min(1).nullable().optional(),
     varies: VariesSchema.optional(),
     text: TextSpecSchema.nullable().optional(),
     visible: z.boolean().optional(),
@@ -35,7 +34,6 @@ function applySet(node: UINode, set: NodeSet): void {
   if (set.type !== undefined) node.type = set.type;
   if (set.role !== undefined) node.role = set.role ?? undefined;
   if (set.concept !== undefined) node.concept = set.concept ?? undefined;
-  if (set.label !== undefined) node.label = set.label ?? undefined;
   if (set.varies !== undefined) node.varies = set.varies;
   if (set.text !== undefined) node.text = set.text ?? undefined;
   if (set.visible !== undefined) node.visible = set.visible;
@@ -50,7 +48,7 @@ export const nodeSet = defineOp({
   name: 'node.set',
   family: 'structure',
   summary:
-    '修改匹配到的每个节点的字段（类型、角色、概念、标签、可变性、文字、显隐、置信度、矩形、证据、锚点、轴心）；null 表示清除',
+    '修改匹配到的每个节点的字段（类型、角色、概念、可变性、文字、显隐、置信度、矩形、证据、锚点、轴心）；null 表示清除',
   schema: z.strictObject({
     op: z.literal('node.set'),
     target: z.string().min(1),

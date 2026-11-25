@@ -31,8 +31,8 @@ async function content(fx: Fixture): Promise<Record<string, string>> {
   return Object.fromEntries(Object.entries(all).filter(([path]) => !path.startsWith('history/')));
 }
 
-const retitle = (label: string) => [
-  { op: 'node.set', target: '#title', set: { label } },
+const retitle = (content: string) => [
+  { op: 'node.set', target: '#title', set: { text: { content } } },
   { op: 'concept.define', name: '标题', exemplars: '#title' },
 ];
 
@@ -114,7 +114,7 @@ describe('undo and redo', () => {
 
     expect((await failureOf(redo(fx.project))).code).toBe(ErrorCodes.historyEmpty);
     await undo(fx.project);
-    expect(loadScreen(fx.project, 'main').nodes.title?.label).toBeUndefined();
+    expect(loadScreen(fx.project, 'main').nodes.title?.text?.content).toBe('标题');
   });
 
   it('restore every file a version touched, including a deleted screen with its source', async () => {

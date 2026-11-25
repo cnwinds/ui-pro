@@ -7,7 +7,7 @@ import { defineOp } from '../tx/registry';
 export const conceptDefine = defineOp({
   name: 'concept.define',
   family: 'structure',
-  summary: '在项目词表里定义或更新概念，并把概念（及角色）标到样例节点上',
+  summary: '在概念库里定义或更新概念，并把概念（及角色）标到样例节点上',
   schema: z.strictObject({
     op: z.literal('concept.define'),
     name: ConceptNameSchema,

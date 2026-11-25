@@ -1,9 +1,21 @@
 import { z } from 'zod';
 import { ErrorCodes, UiProError } from '../errors';
 import { ConceptNameSchema, NodeIdSchema, PrimitiveSchema, RoleSchema } from '../schema/common';
+import type { UINode } from '../schema/screen';
 import { ancestorsOf, detachChild, newNode, requireNode, unionRect } from '../screen/tree';
 import { defineOp } from '../tx/registry';
 import { assertNotRoot, dropExemplars, invalidOp, singleScreen } from './shared';
+
+/** User-made data on a node that a merge cannot carry over to the merged node. */
+function droppedFields(node: UINode): string[] {
+  const dropped: string[] = [];
+  if (node.bind && Object.keys(node.bind).length > 0) dropped.push('数据绑定');
+  if (node.states && Object.keys(node.states).length > 0) dropped.push('状态');
+  if (Object.keys(node.pins).length > 0) dropped.push('钉住的值');
+  if (node.text) dropped.push('文字');
+  if (node.instanceOf !== undefined) dropped.push(`组件实例（${node.instanceOf}）`);
+  return dropped;
+}
 
 export const nodeMerge = defineOp({
   name: 'node.merge',
@@ -19,7 +31,6 @@ export const nodeMerge = defineOp({
         type: PrimitiveSchema.optional(),
         role: RoleSchema.optional(),
         concept: ConceptNameSchema.optional(),
-        label: z.string().min(1).optional(),
       })
       .default({}),
   }),
@@ -37,6 +48,14 @@ export const nodeMerge = defineOp({
     }
 
     const targets = ids.map((id) => requireNode(doc, id));
+    for (const target of targets) {
+      const dropped = droppedFields(target);
+      if (dropped.length > 0) {
+        ctx.warn(
+          `合并后 #${target.id} 的${dropped.join('、')}不再保留，需要时请在合并后的节点上重新设置`,
+        );
+      }
+    }
     const [first] = targets;
     if (!first?.parent) throw invalidOp('node.merge 缺少可合并的目标');
     const mergedId = op.as.id ?? first.id;
@@ -55,7 +74,6 @@ export const nodeMerge = defineOp({
       rect: unionRect(targets.map((target) => target.rect)),
       role: op.as.role ?? first.role,
       concept: op.as.concept ?? first.concept,
-      label: op.as.label ?? first.label,
       visible: first.visible,
       varies: [...first.varies],
       evidence,

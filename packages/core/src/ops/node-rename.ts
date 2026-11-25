@@ -9,7 +9,7 @@ import { selectOne } from './shared';
 export const nodeRename = defineOp({
   name: 'node.rename',
   family: 'structure',
-  summary: '修改节点 id，并同步更新父子关系、组件 master、词表样例以及其他文档里的引用',
+  summary: '修改节点 id，并同步更新父子关系、组件 master、概念库样例以及其他文档里的引用',
   schema: z.strictObject({
     op: z.literal('node.rename'),
     target: z.string().min(1),

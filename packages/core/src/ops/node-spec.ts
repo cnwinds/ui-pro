@@ -15,7 +15,6 @@ export const NodeSpecSchema = z.strictObject({
   type: PrimitiveSchema,
   role: RoleSchema.optional(),
   concept: ConceptNameSchema.optional(),
-  label: z.string().min(1).optional(),
   rect: PositiveRectSchema.optional(),
   /** Selector for the parent; defaults to the screen root (or the split source). */
   parent: z.string().min(1).optional(),

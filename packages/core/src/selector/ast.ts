@@ -6,7 +6,8 @@ export const SELECTOR_ATTRIBUTES = [
   'type',
   'role',
   'concept',
-  'label',
+  /** Matches the node's `text.content`. */
+  'text',
   'parent',
   'visible',
   'varies',

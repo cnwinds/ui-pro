@@ -110,7 +110,6 @@ export function addNode(ctx: TxContext, input: AddNodeInput): NodeRef {
     rect,
     role: spec.role,
     concept: spec.concept,
-    label: spec.label,
     varies: spec.varies,
     text: spec.text,
     visible: spec.visible,

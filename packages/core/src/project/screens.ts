@@ -29,7 +29,7 @@ export function screenNotFoundError(project: Project, name: string): UiProError 
     hint:
       screens.length > 0
         ? `现有界面：${screens.join('、')}`
-        : '工程里还没有界面，用 ui-pro init --screen <name> --source <file> 添加',
+        : '项目里还没有界面，用 ui-pro init --screen <name> --source <file> 添加',
     details: { screens },
   });
 }

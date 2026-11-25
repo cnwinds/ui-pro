@@ -180,7 +180,6 @@ describe('node.set', () => {
         type: 'button',
         role: 'cta.primary',
         concept: '标题',
-        label: '主标题',
         rect: [1, 2, 3, 4],
         varies: ['content', 'state'],
         visible: false,
@@ -196,7 +195,6 @@ describe('node.set', () => {
       type: 'button',
       role: 'cta.primary',
       concept: '标题',
-      label: '主标题',
       rect: [1, 2, 3, 4],
       varies: ['content', 'state'],
       visible: false,
@@ -218,7 +216,6 @@ describe('node.set', () => {
       set: {
         role: null,
         concept: null,
-        label: null,
         text: null,
         confidence: null,
         anchor: null,
@@ -347,7 +344,7 @@ describe('node.merge', () => {
     await run(fx, {
       op: 'node.merge',
       targets: '#btn_upgrade, #title',
-      as: { id: 'combo', type: 'container', role: 'group.combo', concept: '组合', label: '组合' },
+      as: { id: 'combo', type: 'container', role: 'group.combo', concept: '组合' },
     });
 
     expect(childrenOf(fx, 'root')).toEqual(['topbar', 'combo']);
@@ -355,11 +352,20 @@ describe('node.merge', () => {
       type: 'container',
       role: 'group.combo',
       concept: '组合',
-      label: '组合',
       children: ['badge_dot'],
       rect: [100, 300, 680, 1320],
     });
     expect(nodeOf(fx, 'badge_dot').parent).toBe('combo');
+  });
+
+  it('warns about user-made data the merged node does not keep', async () => {
+    const fx = await treeFixture(makeDir);
+
+    const result = await run(fx, { op: 'node.merge', targets: '#btn_upgrade, #title' });
+
+    expect(result.warnings).toEqual([
+      '合并后 #title 的文字不再保留，需要时请在合并后的节点上重新设置',
+    ]);
   });
 
   it('drops glossary exemplars that point at merged-away nodes', async () => {

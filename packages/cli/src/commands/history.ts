@@ -17,7 +17,7 @@ export const historyCommand: CommandModule = {
   register(program, host) {
     const history: Command = program
       .command('history')
-      .description('查看、撤销、重做工程的修改历史');
+      .description('查看、撤销、重做项目的修改历史');
 
     history
       .command('list')

@@ -46,7 +46,7 @@ export function createContext(io: CliIo, globals: GlobalOptions): CommandContext
       const screens = listScreens(project);
       throw new UiProError(
         ErrorCodes.screenNotFound,
-        screens.length === 0 ? '工程里还没有界面' : '工程里有多个界面，需要指定其中一个',
+        screens.length === 0 ? '项目里还没有界面' : '项目里有多个界面，需要指定其中一个',
         {
           hint:
             screens.length === 0

@@ -46,9 +46,9 @@ function notFound(where: string, explicit: boolean): UiProError {
   return new UiProError(
     ErrorCodes.projectNotFound,
     explicit
-      ? `${toPosix(where)} 不是 ui-pro 工程（缺少 ui-pro.yaml）`
-      : '当前目录及其上级都不是 ui-pro 工程',
-    { hint: '先运行 ui-pro init 创建工程，或用 --project 指定工程目录' },
+      ? `${toPosix(where)} 不是 ui-pro 项目（缺少 ui-pro.yaml）`
+      : '当前目录及其上级都不是 ui-pro 项目',
+    { hint: '先运行 ui-pro init 创建项目，或用 --project 指定项目目录' },
   );
 }
 
@@ -58,7 +58,7 @@ export function loadProject(root: string): Project {
   try {
     text = readFileSync(path, 'utf8');
   } catch (error) {
-    throw ioError('读取工程配置', path, error);
+    throw ioError('读取项目配置', path, error);
   }
   return { root, config: projectConfigCodec.parse(text, PROJECT_FILES.config) };
 }
@@ -96,8 +96,8 @@ export async function createProject(
     throw new UiProError(ErrorCodes.io, `${toPosix(root)} 已存在且不是目录`);
   }
   if (isProjectDir(root)) {
-    throw new UiProError(ErrorCodes.projectExists, `${toPosix(root)} 已经是 ui-pro 工程`, {
-      hint: '要新增界面，请在工程内运行 ui-pro init --screen <name> --source <file>',
+    throw new UiProError(ErrorCodes.projectExists, `${toPosix(root)} 已经是 ui-pro 项目`, {
+      hint: '要新增界面，请在项目内运行 ui-pro init --screen <name> --source <file>',
     });
   }
 

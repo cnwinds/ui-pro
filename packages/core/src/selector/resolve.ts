@@ -39,8 +39,8 @@ function attributeValue(
       return node.role;
     case 'concept':
       return node.concept;
-    case 'label':
-      return node.label;
+    case 'text':
+      return node.text?.content;
     case 'parent':
       return node.parent ?? undefined;
     case 'visible':

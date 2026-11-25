@@ -252,14 +252,14 @@ describe('results and history', () => {
       JSON.stringify({ screen: 'main', ids: ['title', 'btn_shop'] }),
     );
 
-    await apply(fx, [{ op: 'node.set', target: '@selection', set: { label: '选中' } }]);
+    await apply(fx, [{ op: 'node.set', target: '@selection', set: { concept: '选中' } }]);
 
     const doc = loadScreen(fx.project, 'main');
-    expect([doc.nodes.title?.label, doc.nodes.btn_shop?.label, doc.nodes.btn_mail?.label]).toEqual([
-      '选中',
-      '选中',
-      undefined,
-    ]);
+    expect([
+      doc.nodes.title?.concept,
+      doc.nodes.btn_shop?.concept,
+      doc.nodes.btn_mail?.concept,
+    ]).toEqual(['选中', '选中', undefined]);
   });
 });
 

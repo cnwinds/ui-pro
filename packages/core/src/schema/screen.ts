@@ -70,7 +70,6 @@ export const UINodeSchema = z.strictObject({
   type: PrimitiveSchema,
   role: RoleSchema.optional(),
   concept: ConceptNameSchema.optional(),
-  label: z.string().optional(),
   parent: z.string().nullable(),
   children: z.array(z.string()),
   rect: RectSchema,

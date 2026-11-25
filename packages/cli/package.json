@@ -1,0 +1,26 @@
+{
+  "name": "@ui-pro/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "ui-pro": "./bin/ui-pro.mjs"
+  },
+  "dependencies": {
+    "@ui-pro/adapter-godot": "workspace:*",
+    "@ui-pro/build": "workspace:*",
+    "@ui-pro/core": "workspace:*",
+    "@ui-pro/perception": "workspace:*",
+    "@ui-pro/psd": "workspace:*",
+    "@ui-pro/rules": "workspace:*",
+    "@ui-pro/verify": "workspace:*",
+    "commander": "^15.1.0",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.5"
+  }
+}

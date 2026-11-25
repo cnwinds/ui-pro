@@ -1,0 +1,14 @@
+{
+  "name": "@ui-pro/psd",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ui-pro/core": "workspace:*",
+    "ag-psd": "^34.2.3",
+    "sharp": "^0.35.5"
+  }
+}

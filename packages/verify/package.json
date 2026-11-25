@@ -1,0 +1,14 @@
+{
+  "name": "@ui-pro/verify",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ui-pro/build": "workspace:*",
+    "@ui-pro/core": "workspace:*",
+    "sharp": "^0.35.5"
+  }
+}

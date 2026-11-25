@@ -1,0 +1,16 @@
+{
+  "name": "@ui-pro/build",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ui-pro/core": "workspace:*",
+    "@ui-pro/perception": "workspace:*",
+    "@ui-pro/psd": "workspace:*",
+    "@ui-pro/rules": "workspace:*",
+    "sharp": "^0.35.5"
+  }
+}

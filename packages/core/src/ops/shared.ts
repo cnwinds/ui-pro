@@ -64,6 +64,19 @@ export function rectFromEvidence(ctx: TxContext, doc: ScreenDoc, refs: readonly 
   return roundRect(sourceToDesign(unionRect(boxes), doc.scale));
 }
 
+/** The visual cluster shared by every candidate behind `refs`; none when they disagree. */
+function clusterFromEvidence(
+  ctx: TxContext,
+  doc: ScreenDoc,
+  refs: readonly string[],
+): string | undefined {
+  const evidence = ctx.evidence(doc.name);
+  if (!evidence || refs.length === 0) return undefined;
+  const byId = new Map(evidence.candidates.map((candidate) => [candidate.id, candidate.cluster]));
+  const clusters = new Set(refs.map((ref) => byId.get(ref)));
+  return clusters.size === 1 ? [...clusters][0] : undefined;
+}
+
 export interface AddNodeInput {
   spec: NodeSpec;
   /** Evidence refs recorded on the node; also the rect source when no rect is given. */
@@ -113,6 +126,7 @@ export function addNode(ctx: TxContext, input: AddNodeInput): NodeRef {
     varies: spec.varies,
     text: spec.text,
     visible: spec.visible,
+    cluster: clusterFromEvidence(ctx, doc, input.evidence),
     evidence: [...input.evidence],
   });
   attachChild(doc, parent.id, id, spec.index);

@@ -1,8 +1,11 @@
 import { ErrorCodes, isUiProError, UiProError, withErrorDetails } from '../errors';
 import { withProjectLock } from '../fs/lock';
-import { commitVersion } from '../history/commit';
+import { commitVersion, type FileWrite } from '../history/commit';
 import type { ChangeSource } from '../history/log';
+import { screenRelPath } from '../paths';
+import { checkEvidence, type EvidenceUpdate, evidenceWrites } from '../project/evidence';
 import type { Project } from '../project/project';
+import type { CandidatesDoc } from '../schema/candidates';
 import { formatIssues } from '../schema/codec';
 import type { ChangeSet } from './changes';
 import { defaultRegistry } from './default-registry';
@@ -21,6 +24,11 @@ export interface ApplyOptions {
   source?: ChangeSource;
   /** Defaults to the registry other packages register into. */
   registry?: Registry;
+  /**
+   * Screen name -> new evidence, committed in the same version as the ops. The ops already see it,
+   * so an analysis can write its candidates and the draft built on them as one undoable step.
+   */
+  evidence?: Readonly<Record<string, EvidenceUpdate>>;
 }
 
 export interface ApplyResult {
@@ -73,8 +81,9 @@ function execute(
   registry: Registry,
   ops: readonly unknown[],
   screen: string | undefined,
+  evidence: ReadonlyMap<string, CandidatesDoc>,
 ): Transaction {
-  const tx = new Transaction(project, registry, screen);
+  const tx = new Transaction(project, registry, screen, evidence);
   ops.forEach((raw, index) => {
     try {
       runOp(tx, registry, raw, index);
@@ -109,21 +118,38 @@ export async function applyOps(
   options: ApplyOptions = {},
 ): Promise<ApplyResult> {
   const registry = options.registry ?? defaultRegistry;
-  const result = (tx: Transaction, dryRun: boolean, version?: number): ApplyResult => ({
-    ok: true,
-    dryRun,
-    version,
-    changes: tx.changes(),
-    warnings: [...tx.warnings],
-    ask: [...tx.asks],
-  });
+  const updates = Object.entries(options.evidence ?? {}).map(([screen, update]) => ({
+    screen,
+    candidates: checkEvidence(project, screen, update),
+    files: update.files,
+  }));
+  const evidence = new Map(updates.map((update) => [update.screen, update.candidates]));
+  const evidenceDocs = updates.map((update) => screenRelPath(update.screen, 'candidates'));
+  const result = (tx: Transaction, dryRun: boolean, version?: number): ApplyResult => {
+    const changes = tx.changes();
+    const docs = [...new Set([...changes.docs, ...evidenceDocs])].sort();
+    return {
+      ok: true,
+      dryRun,
+      version,
+      changes: { ...changes, docs },
+      warnings: [...tx.warnings],
+      ask: [...tx.asks],
+    };
+  };
 
-  if (options.dryRun) return result(execute(project, registry, ops, options.screen), true);
+  if (options.dryRun) {
+    return result(execute(project, registry, ops, options.screen, evidence), true);
+  }
 
   return withProjectLock(project.root, async () => {
-    const tx = execute(project, registry, ops, options.screen);
+    const tx = execute(project, registry, ops, options.screen, evidence);
+    const writes: FileWrite[] = [...tx.pendingWrites()];
+    for (const { screen, candidates, files } of updates) {
+      writes.push(...(await evidenceWrites(project, screen, candidates, files)));
+    }
     const entry = await commitVersion(project, {
-      writes: tx.pendingWrites(),
+      writes,
       source: options.source ?? 'cli',
       message: options.message ?? defaultMessage(ops),
       ops,

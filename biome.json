@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!docs", "!benchmark", "!pnpm-lock.yaml", "!**/*.md"]
+    "includes": ["**", "!docs", "!benchmark", "!.scratch", "!pnpm-lock.yaml", "!**/*.md"]
   },
   "formatter": {
     "enabled": true,

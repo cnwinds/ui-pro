@@ -1,0 +1,10 @@
+let registered = false;
+
+/**
+ * Registers what other packages contribute to the kernel (ops, hooks, document kinds) into the
+ * default registry. Idempotent, because tests build many programs in one process.
+ */
+export function registerPlugins(): void {
+  if (registered) return;
+  registered = true;
+}

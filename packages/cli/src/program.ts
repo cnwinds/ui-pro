@@ -2,9 +2,11 @@ import { Command, Option } from 'commander';
 import { commandModules } from './commands';
 import { createHost, type ResultSlot } from './host';
 import type { CliIo, TextSink } from './io';
+import { registerPlugins } from './plugins';
 
 /** The commander tree: global options plus every registered command module. */
 export function buildProgram(io: CliIo, stdout: TextSink, slot: ResultSlot): Command {
+  registerPlugins();
   const program = new Command('ui-pro')
     .description('把游戏界面的拍平图或 PSD 还原为可交互、可导出到 Godot 的界面')
     .exitOverride()

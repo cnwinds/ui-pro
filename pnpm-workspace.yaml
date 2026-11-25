@@ -3,3 +3,11 @@ packages:
 
 onlyBuiltDependencies:
   - esbuild
+
+# Ships prebuilt CPU binaries; its install script only fetches optional GPU builds.
+ignoredBuiltDependencies:
+  - onnxruntime-node
+
+# Two sharp versions cannot share one process on Windows (libvips DLL clash).
+overrides:
+  sharp: ^0.35.5

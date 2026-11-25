@@ -27,6 +27,8 @@ export {
 } from './paths';
 export type { AddScreenInput, AddScreenResult } from './project/add-screen';
 export { addScreen } from './project/add-screen';
+export type { AnalysisReport, AnalyzeOptions } from './project/analysis';
+export { COMPOSITE_EVIDENCE, referenceImagePath } from './project/analysis';
 export {
   candidatesCodec,
   glossaryCodec,
@@ -37,6 +39,7 @@ export {
   projectConfigCodec,
 } from './project/codecs';
 export { glossaryKind, projectConfigKind, SINGLETON_KEY, screenKind } from './project/docs';
+export type { EvidenceFile, EvidenceUpdate } from './project/evidence';
 export { readCandidates, roundRect, sourceToDesign } from './project/evidence';
 export type { CreateProjectOptions, Project } from './project/project';
 export { createProject, findProjectRoot, loadProject, openProject } from './project/project';

@@ -43,10 +43,17 @@ export class Transaction implements TxContext {
   readonly project: Project;
   readonly currentScreen: string | undefined;
 
-  constructor(project: Project, registry: Registry, currentScreen: string | undefined) {
+  /** `evidence` replaces the on-disk evidence of those screens for the whole transaction. */
+  constructor(
+    project: Project,
+    registry: Registry,
+    currentScreen: string | undefined,
+    evidence: ReadonlyMap<string, CandidatesDoc> = new Map(),
+  ) {
     this.project = project;
     this.currentScreen = currentScreen;
     this.#registry = registry;
+    for (const [screen, doc] of evidence) this.#evidence.set(screen, doc);
     this.#env = {
       currentScreen,
       listScreens: () => this.#screenNames(),

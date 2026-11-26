@@ -1,3 +1,4 @@
+import { registerBuild } from '@ui-pro/build';
 import { defaultRegistry } from '@ui-pro/core';
 import { registerRules } from '@ui-pro/rules';
 
@@ -11,4 +12,5 @@ export function registerPlugins(): void {
   if (registered) return;
   registered = true;
   registerRules(defaultRegistry);
+  registerBuild(defaultRegistry);
 }

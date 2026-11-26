@@ -2,9 +2,18 @@ import { ErrorCodes, isUiProError, UiProError, withErrorDetails } from '../error
 import { withProjectLock } from '../fs/lock';
 import { commitVersion, type FileWrite } from '../history/commit';
 import type { ChangeSource } from '../history/log';
-import { screenRelPath } from '../paths';
+import { PROJECT_FILES, screenRelPath } from '../paths';
+import {
+  type AssetUpdate,
+  assetRelPath,
+  assetWrites,
+  checkAssets,
+  checkLock,
+  lockWrite,
+} from '../project/assets';
 import { checkEvidence, type EvidenceUpdate, evidenceWrites } from '../project/evidence';
 import type { Project } from '../project/project';
+import type { AssetManifest, LockDoc } from '../schema/assets';
 import type { CandidatesDoc } from '../schema/candidates';
 import { formatIssues } from '../schema/codec';
 import type { ChangeSet } from './changes';
@@ -29,6 +38,13 @@ export interface ApplyOptions {
    * so an analysis can write its candidates and the draft built on them as one undoable step.
    */
   evidence?: Readonly<Record<string, EvidenceUpdate>>;
+  /**
+   * Screen name -> a build's assets, committed in the same version as the ops that bind them to
+   * nodes; the ops see the new manifest through `ctx.assets`.
+   */
+  assets?: Readonly<Record<string, AssetUpdate>>;
+  /** Replaces `ui-pro.lock` in the same version. */
+  lock?: LockDoc;
 }
 
 export interface ApplyResult {
@@ -82,8 +98,9 @@ function execute(
   ops: readonly unknown[],
   screen: string | undefined,
   evidence: ReadonlyMap<string, CandidatesDoc>,
+  assets: ReadonlyMap<string, AssetManifest>,
 ): Transaction {
-  const tx = new Transaction(project, registry, screen, evidence);
+  const tx = new Transaction(project, registry, screen, evidence, assets);
   ops.forEach((raw, index) => {
     try {
       runOp(tx, registry, raw, index);
@@ -124,10 +141,26 @@ export async function applyOps(
     files: update.files,
   }));
   const evidence = new Map(updates.map((update) => [update.screen, update.candidates]));
-  const evidenceDocs = updates.map((update) => screenRelPath(update.screen, 'candidates'));
+  const builds = Object.entries(options.assets ?? {}).map(([screen, update]) => ({
+    screen,
+    manifest: checkAssets(project, screen, update),
+    update,
+  }));
+  const assets = new Map(builds.map((build) => [build.screen, build.manifest]));
+  const pendingGenerated = new Set(
+    builds.flatMap((build) =>
+      (build.update.generated ?? []).map((file) => assetRelPath(build.screen, file.path)),
+    ),
+  );
+  const lock = options.lock && checkLock(project, options.lock, pendingGenerated);
+  const extraDocs = [
+    ...updates.map((update) => screenRelPath(update.screen, 'candidates')),
+    ...builds.map((build) => screenRelPath(build.screen, 'assets')),
+    ...(lock ? [PROJECT_FILES.lock] : []),
+  ];
   const result = (tx: Transaction, dryRun: boolean, version?: number): ApplyResult => {
     const changes = tx.changes();
-    const docs = [...new Set([...changes.docs, ...evidenceDocs])].sort();
+    const docs = [...new Set([...changes.docs, ...extraDocs])].sort();
     return {
       ok: true,
       dryRun,
@@ -139,15 +172,19 @@ export async function applyOps(
   };
 
   if (options.dryRun) {
-    return result(execute(project, registry, ops, options.screen, evidence), true);
+    return result(execute(project, registry, ops, options.screen, evidence, assets), true);
   }
 
   return withProjectLock(project.root, async () => {
-    const tx = execute(project, registry, ops, options.screen, evidence);
+    const tx = execute(project, registry, ops, options.screen, evidence, assets);
     const writes: FileWrite[] = [...tx.pendingWrites()];
     for (const { screen, candidates, files } of updates) {
       writes.push(...(await evidenceWrites(project, screen, candidates, files)));
     }
+    for (const { screen, manifest, update } of builds) {
+      writes.push(...(await assetWrites(project, screen, manifest, update)));
+    }
+    if (lock) writes.push(lockWrite(lock));
     const entry = await commitVersion(project, {
       writes,
       source: options.source ?? 'cli',

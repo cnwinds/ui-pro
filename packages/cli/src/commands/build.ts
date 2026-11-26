@@ -2,5 +2,5 @@ import { stubCommand } from './stub';
 
 export const buildCommand = stubCommand({
   name: 'build',
-  description: '从界面文档生成资源（切图、九宫格、字体等）',
+  description: '按决定构建界面的资产（抠取、补全、文字剥离、九宫、提升分辨率）',
 });

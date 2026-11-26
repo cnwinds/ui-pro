@@ -26,6 +26,9 @@ export const PROJECT_FILES = {
   glossary: 'glossary.yaml',
   projectRules: 'rules/project.yaml',
   gitignore: '.gitignore',
+  lock: 'ui-pro.lock',
+  /** Append-only record of every image sent to a cloud service (DESIGN §6.6 constraint 8). */
+  egress: 'history/egress.jsonl',
 } as const;
 
 export const PROJECT_DIRS = ['kit', 'rules', 'screens', 'resources', 'export', 'history'] as const;
@@ -39,7 +42,11 @@ export const SCREEN_FILES = {
   rules: 'rules.yaml',
   mock: 'mock.json',
   candidates: 'evidence/candidates.json',
+  assets: 'assets/manifest.json',
 } as const;
+
+/** Locked model outputs under a screen's `assets/`; builds add to it and never delete from it. */
+export const GENERATED_DIR = 'gen';
 
 export function screenRelDir(screen: string): string {
   return `screens/${screen}`;

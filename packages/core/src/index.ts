@@ -14,6 +14,7 @@ export { formatJson } from './json';
 export { builtinOps } from './ops';
 export { editNodes, invalidOp, selectOne, singleScreen } from './ops/shared';
 export {
+  GENERATED_DIR,
   PROJECT_DIRS,
   PROJECT_FILES,
   resolveInside,
@@ -29,13 +30,17 @@ export type { AddScreenInput, AddScreenResult } from './project/add-screen';
 export { addScreen } from './project/add-screen';
 export type { AnalysisReport, AnalyzeOptions } from './project/analysis';
 export { COMPOSITE_EVIDENCE, referenceImagePath } from './project/analysis';
+export type { AssetFile, AssetUpdate } from './project/assets';
+export { assetRelPath, readAssetFile, readAssetManifest, readLock } from './project/assets';
 export {
+  assetManifestCodec,
   candidatesCodec,
   glossaryCodec,
   INITIAL_BEHAVIOR,
   INITIAL_MOCK,
   INITIAL_PROJECT_RULES,
   INITIAL_SCREEN_RULES,
+  lockCodec,
   projectConfigCodec,
 } from './project/codecs';
 export { glossaryKind, projectConfigKind, SINGLETON_KEY, screenKind } from './project/docs';
@@ -53,6 +58,7 @@ export {
 export { readSelection } from './project/selection';
 export type { InspectedSource, SourceFile } from './project/source';
 export { inspectSource, readPsdHeader } from './project/source';
+export * from './schema/assets';
 export * from './schema/candidates';
 export type { CanonicalOptions } from './schema/canonical';
 export { canonicalize } from './schema/canonical';
@@ -61,6 +67,8 @@ export { formatIssues, jsonCodec, parseWithSchema, stripBom, yamlCodec } from '.
 export * from './schema/common';
 export * from './schema/project';
 export * from './schema/screen';
+export type { ExpectedHole, Ownership } from './screen/ownership';
+export { expectedHoles, intersectRect, pixelOwnership } from './screen/ownership';
 export { parseScreen, screenCodec, serializeScreen } from './screen/serialize';
 export type { NewNodeFields } from './screen/tree';
 export {

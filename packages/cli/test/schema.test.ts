@@ -20,6 +20,9 @@ describe('ui-pro schema', () => {
       'node.move',
       'node.remove',
       'node.rename',
+      'cluster.split',
+      'exclusion.add',
+      'exclusion.remove',
       'concept.define',
       'component.extract',
       'pin.set',
@@ -36,7 +39,7 @@ describe('ui-pro schema', () => {
       'exception.remove',
       'rule.recompute',
     ]);
-    expect(envelope.summary).toBe('共 22 个操作');
+    expect(envelope.summary).toBe('共 25 个操作');
     expect(envelope.next).toEqual(['ui-pro schema <op>  # 查看某个操作的参数']);
   });
 

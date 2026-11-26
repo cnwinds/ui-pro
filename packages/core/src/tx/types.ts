@@ -1,12 +1,13 @@
 import type { z } from 'zod';
 import type { UiProError } from '../errors';
 import type { Project } from '../project/project';
+import type { AssetManifest } from '../schema/assets';
 import type { CandidatesDoc } from '../schema/candidates';
 import type { Glossary } from '../schema/project';
 import type { ScreenDoc } from '../schema/screen';
 import type { NodeRef } from '../selector/ref';
 
-export type OpFamily = 'structure' | 'measure' | 'rules' | 'presentation';
+export type OpFamily = 'structure' | 'measure' | 'rules' | 'presentation' | 'build';
 
 /** A question the agent must put to the user; surfaced in the `ask` field of responses. */
 export interface AskQuestion {
@@ -62,6 +63,8 @@ export interface TxContext {
   ask(question: AskQuestion): void;
   /** Read-only candidate evidence of a screen, `null` before analysis. */
   evidence(screen: string): CandidatesDoc | null;
+  /** Read-only asset manifest of a screen (the one being committed, if any), `null` before a build. */
+  assets(screen: string): AssetManifest | null;
   /** Lets other document kinds follow a node id change. */
   runRenameHooks(event: RenameEvent): void;
 }

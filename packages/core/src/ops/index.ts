@@ -1,6 +1,8 @@
 import type { OpDefinition } from '../tx/types';
+import { clusterSplit } from './cluster-split';
 import { componentExtract } from './component-extract';
 import { conceptDefine } from './concept-define';
+import { exclusionAdd, exclusionRemove } from './exclusion';
 import { nodeAdd } from './node-add';
 import { nodeMerge } from './node-merge';
 import { nodeMove } from './node-move';
@@ -20,6 +22,9 @@ export const builtinOps: readonly OpDefinition[] = [
   nodeMove,
   nodeRemove,
   nodeRename,
+  clusterSplit,
+  exclusionAdd,
+  exclusionRemove,
   conceptDefine,
   componentExtract,
   pinSet,

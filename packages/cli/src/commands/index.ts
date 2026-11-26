@@ -10,6 +10,7 @@ import { psdCommand } from './psd';
 import { queryCommand } from './query';
 import { rulesCommand } from './rules';
 import { schemaCommand } from './schema';
+import { skillCommand } from './skill';
 import { snapCommand } from './snap';
 import type { CommandModule } from './types';
 import { verifyCommand } from './verify';
@@ -30,4 +31,5 @@ export const commandModules: readonly CommandModule[] = [
   exportCommand,
   historyCommand,
   schemaCommand,
+  skillCommand,
 ];

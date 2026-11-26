@@ -2,11 +2,13 @@ import { ErrorCodes, UiProError } from '../errors';
 import { readFileIfExistsSync } from '../fs/files';
 import type { FileWrite } from '../history/commit';
 import { resolveInside } from '../paths';
+import { readAssetManifest } from '../project/assets';
 import { glossaryKind, SINGLETON_KEY, screenKind } from '../project/docs';
 import { readCandidates } from '../project/evidence';
 import type { Project } from '../project/project';
 import { listScreens } from '../project/screens';
 import { readSelection } from '../project/selection';
+import type { AssetManifest } from '../schema/assets';
 import type { CandidatesDoc } from '../schema/candidates';
 import type { Glossary } from '../schema/project';
 import type { ScreenDoc } from '../schema/screen';
@@ -35,6 +37,7 @@ const MAX_REPORTED_PROBLEMS = 8;
 export class Transaction implements TxContext {
   readonly #drafts = new Map<string, Draft>();
   readonly #evidence = new Map<string, CandidatesDoc | null>();
+  readonly #assets = new Map<string, AssetManifest | null>();
   readonly #touchedScreens = new Set<string>();
   readonly #warnings: string[] = [];
   readonly #asks: AskQuestion[] = [];
@@ -43,17 +46,22 @@ export class Transaction implements TxContext {
   readonly project: Project;
   readonly currentScreen: string | undefined;
 
-  /** `evidence` replaces the on-disk evidence of those screens for the whole transaction. */
+  /**
+   * `evidence` and `assets` replace the on-disk evidence and asset manifests of those screens for
+   * the whole transaction.
+   */
   constructor(
     project: Project,
     registry: Registry,
     currentScreen: string | undefined,
     evidence: ReadonlyMap<string, CandidatesDoc> = new Map(),
+    assets: ReadonlyMap<string, AssetManifest> = new Map(),
   ) {
     this.project = project;
     this.currentScreen = currentScreen;
     this.#registry = registry;
     for (const [screen, doc] of evidence) this.#evidence.set(screen, doc);
+    for (const [screen, manifest] of assets) this.#assets.set(screen, manifest);
     this.#env = {
       currentScreen,
       listScreens: () => this.#screenNames(),
@@ -135,6 +143,15 @@ export class Transaction implements TxContext {
       this.#evidence.set(screen, doc);
     }
     return doc;
+  }
+
+  assets(screen: string): AssetManifest | null {
+    let manifest = this.#assets.get(screen);
+    if (manifest === undefined) {
+      manifest = readAssetManifest(this.project, screen);
+      this.#assets.set(screen, manifest);
+    }
+    return manifest;
   }
 
   runRenameHooks(event: RenameEvent): void {

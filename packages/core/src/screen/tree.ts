@@ -50,6 +50,7 @@ export function createScreenDoc(input: {
     root: ROOT_ID,
     nodes: { [ROOT_ID]: root },
     components: {},
+    exclusions: [],
   };
 }
 

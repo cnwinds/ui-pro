@@ -1,12 +1,11 @@
 import { defineConfig } from 'vitest/config';
 
-// Integration tests that drive OCR, Godot or a browser and assert time budgets: they run after
-// the rest, one file at a time, so they do not compete with each other for the CPU.
+// Integration tests that drive OCR, local models, Godot or a browser and assert time budgets:
+// they run after the rest, one file at a time, so they do not compete with each other for the CPU.
 const HEAVY = [
+  'packages/*/test/**/*.integration.test.ts',
   'packages/perception/test/candy-knight.test.ts',
-  'packages/adapter-godot/test/export.integration.test.ts',
   'packages/cli/test/export.test.ts',
-  'packages/psd/test/photopea.integration.test.ts',
 ];
 
 export default defineConfig({

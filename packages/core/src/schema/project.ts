@@ -11,6 +11,16 @@ export const DEFAULT_DESIGN: DesignSize = { width: 1080, height: 1920 };
 
 export const ENGINES = ['godot'] as const;
 export const EGRESS_LEVELS = ['cloud', 'hybrid', 'local'] as const;
+export type EgressLevel = (typeof EGRESS_LEVELS)[number];
+export const IMAGE_MODEL_PROVIDERS = ['dashscope', 'none'] as const;
+
+/** The cloud image model. The API key is never stored here: it comes from the environment. */
+export const ImageModelConfigSchema = z.strictObject({
+  provider: z.enum(IMAGE_MODEL_PROVIDERS).default('dashscope'),
+  /** Service base URL, e.g. a DashScope workspace domain; the provider's public default otherwise. */
+  endpoint: z.url().optional(),
+});
+export type ImageModelConfig = z.infer<typeof ImageModelConfigSchema>;
 
 export const ProjectConfigSchema = z.strictObject({
   format: z.literal('ui-pro/project'),
@@ -19,9 +29,12 @@ export const ProjectConfigSchema = z.strictObject({
   design: DesignSizeSchema.default(DEFAULT_DESIGN),
   engine: z.enum(ENGINES).default('godot'),
   egress: z.enum(EGRESS_LEVELS).default('cloud'),
+  image_model: ImageModelConfigSchema.default({ provider: 'dashscope' }),
   budget: z
     .strictObject({ image_calls_per_screen: z.number().int().positive() })
     .default({ image_calls_per_screen: 200 }),
+  /** Font name (what `text.font` holds) -> project-relative font file, e.g. under `resources/fonts/`. */
+  fonts: z.record(z.string().min(1), z.string().min(1)).default({}),
   psd: z.strictObject({ prefixes: z.record(z.string(), z.string()).optional() }).default({}),
   export: z
     .strictObject({

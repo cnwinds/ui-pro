@@ -1,46 +1,45 @@
-import type { ScreenDoc, UINode } from '@ui-pro/core';
-import sharp from 'sharp';
-import { wantsAsset } from './plan';
-
-export interface ExportAsset {
-  /** PNG at design resolution: one texel per design pixel of the node's box. */
-  png: Uint8Array;
-  /** The pixels are a stand-in, not an asset built for the node. */
-  approximate?: boolean;
-}
-
-/** Where the export gets a node's texture; `undefined` means the node has none. */
-export type AssetSource = (
-  node: UINode,
-) => Promise<ExportAsset | undefined> | ExportAsset | undefined;
+import { existsSync } from 'node:fs';
+import {
+  type AssetManifest,
+  type AssetRecord,
+  type Project,
+  readAssetFile,
+  readAssetManifest,
+  resolveInside,
+} from '@ui-pro/core';
 
 /**
- * Stand-in assets: the node's box cut out of the reference image and scaled to design pixels.
- * A parent's crop also holds its children's pixels; they sit where the children draw, so the
- * scene still looks like the reference.
+ * Where the export gets the built assets: the screen's manifest and the bytes of each file. The
+ * adapter does not care where they live; tests hand it hand-written ones.
  */
-export async function referenceCropSource(
-  doc: ScreenDoc,
-  reference: Uint8Array,
-): Promise<AssetSource> {
-  const { data, info } = await sharp(reference)
-    .ensureAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
+export interface AssetSource {
+  /** `null` before the first build; every node that draws an asset is then reported missing. */
+  manifest: AssetManifest | null;
+  /** The file's PNG bytes, or `null` when it is missing. */
+  read(record: AssetRecord): Uint8Array | null | Promise<Uint8Array | null>;
+}
 
-  return async (node) => {
-    if (!wantsAsset(node)) return undefined;
-    const [x, y, w, h] = node.rect;
-    const left = Math.max(0, Math.floor(x / doc.scale));
-    const top = Math.max(0, Math.floor(y / doc.scale));
-    const right = Math.min(info.width, Math.ceil((x + w) / doc.scale));
-    const bottom = Math.min(info.height, Math.ceil((y + h) / doc.scale));
-    if (right <= left || bottom <= top) return undefined;
-    const png = await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
-      .extract({ left, top, width: right - left, height: bottom - top })
-      .resize(Math.max(1, Math.round(w)), Math.max(1, Math.round(h)), { fit: 'fill' })
-      .png()
-      .toBuffer();
-    return { png, approximate: true };
+/** The assets a UI-Pro project holds for `screen`. */
+export function projectAssetSource(project: Project, screen: string): AssetSource {
+  return {
+    manifest: readAssetManifest(project, screen),
+    read: (record) => readAssetFile(project, screen, record.file),
   };
+}
+
+/**
+ * The project's fonts that can be exported: font name -> absolute path of the font file. A font
+ * whose file is missing or outside the project is left out, so the export reports it.
+ */
+export function projectFonts(project: Project): Record<string, string> {
+  const fonts: Record<string, string> = {};
+  for (const [name, file] of Object.entries(project.config.fonts)) {
+    try {
+      const path = resolveInside(project.root, file);
+      if (existsSync(path)) fonts[name] = path;
+    } catch {
+      // A path outside the project is not exported.
+    }
+  }
+  return fonts;
 }

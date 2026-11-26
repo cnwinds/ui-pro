@@ -1,10 +1,58 @@
 import { existsSync, statSync } from 'node:fs';
 import { mkdir, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { toPosix, UiProError, writeFileAtomic } from '@ui-pro/core';
+import { readFileIfExists, toPosix, UiProError, writeFileAtomic } from '@ui-pro/core';
 import { GodotErrorCodes } from './errors';
 
 export const GODOT_PROJECT_FILE = 'project.godot';
+
+/**
+ * How a new Godot project scales its window (spec 12): `canvas_items` stretches the UI with the
+ * window, `expand` keeps the aspect ratio of the design size and gives the extra room to the
+ * anchored nodes. The viewport matrix of the adaptation gate assumes these two.
+ */
+export const STRETCH_MODE = 'canvas_items';
+export const STRETCH_ASPECT = 'expand';
+
+/** The display settings of a Godot project the tool cares about; `undefined` when not set. */
+export interface GodotDisplaySettings {
+  width?: number;
+  height?: number;
+  stretchMode?: string;
+  stretchAspect?: string;
+}
+
+/** Reads the `[display]` section of a `project.godot` text. */
+export function parseDisplaySettings(text: string): GodotDisplaySettings {
+  const values = new Map<string, string>();
+  let section = '';
+  for (const line of text.split(/\r?\n/)) {
+    const header = /^\[([^\]]+)\]\s*$/.exec(line.trim());
+    if (header) {
+      section = header[1] ?? '';
+      continue;
+    }
+    const pair = /^([\w/.]+)\s*=\s*(.*)$/.exec(line.trim());
+    if (section === 'display' && pair) values.set(pair[1] ?? '', (pair[2] ?? '').trim());
+  }
+  const text_ = (key: string): string | undefined => values.get(key)?.replace(/^"(.*)"$/, '$1');
+  const number = (key: string): number | undefined => {
+    const value = Number(text_(key));
+    return Number.isFinite(value) && text_(key) !== undefined ? value : undefined;
+  };
+  return {
+    width: number('window/size/viewport_width'),
+    height: number('window/size/viewport_height'),
+    stretchMode: text_('window/stretch/mode'),
+    stretchAspect: text_('window/stretch/aspect'),
+  };
+}
+
+/** The display settings of the Godot project in `dir`, or `undefined` when it has no `project.godot`. */
+export async function readDisplaySettings(dir: string): Promise<GodotDisplaySettings | undefined> {
+  const text = await readFileIfExists(join(dir, GODOT_PROJECT_FILE));
+  return text === null ? undefined : parseDisplaySettings(text.toString('utf8'));
+}
 
 export interface NewGodotProject {
   name: string;
@@ -27,6 +75,8 @@ config/features=PackedStringArray("4.6", "GL Compatibility")
 
 window/size/viewport_width=${project.width}
 window/size/viewport_height=${project.height}
+window/stretch/mode="${STRETCH_MODE}"
+window/stretch/aspect="${STRETCH_ASPECT}"
 
 [rendering]
 

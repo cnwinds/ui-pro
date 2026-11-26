@@ -1,5 +1,5 @@
 import type { Primitive } from '@ui-pro/core';
-import type { Approximation, GodotClass } from './plan';
+import type { Approximation, GodotClass, MissingAsset } from './plan';
 
 /** What `builder.gd` wrote about a run. */
 export interface BuilderResult {
@@ -23,9 +23,14 @@ export interface ReportConflict {
 }
 
 export interface ReportAsset {
-  id: string;
-  /** Path relative to the Godot project. */
+  /** The asset's name in the manifest. */
+  name: string;
+  /** Path relative to the Godot project; one file however many nodes use it. */
   file: string;
+  origin: string;
+  /** Nodes that draw it. */
+  nodes: string[];
+  /** The manifest lists approximations for it. */
   approximate: boolean;
 }
 
@@ -40,10 +45,13 @@ export interface ExportReport {
   scene: string;
   /** Everything the export wrote, relative to the Godot project. */
   files: string[];
-  nodes: { id: string; name: string; type: Primitive; godot: GodotClass }[];
+  nodes: { id: string; name: string; type: Primitive; godot: GodotClass; art?: string }[];
   /** Nodes exported as a bare `Control` because their primitive is not mapped yet. */
   placeholders: { id: string; type: Primitive }[];
+  /** Nodes that should draw an asset but have none; they are empty in the scene. */
+  missingAssets: MissingAsset[];
   assets: ReportAsset[];
+  /** The manifest's approximations and the export's own, with the nodes concerned. */
   approximations: Approximation[];
   created: string[];
   updated: { id: string; keys: string[] }[];
@@ -68,6 +76,7 @@ const BUILD_ERROR_MESSAGES: Record<string, string> = {
   scene_unloadable: '已有的场景文件加载失败',
   save_failed: '场景保存失败',
   texture_missing: '资产没有被 Godot 导入，找不到贴图',
+  font_missing: '字体文件没有被 Godot 导入，找不到字体',
   class_unknown: '界面规格里有构建器不认识的 Godot 类型',
 };
 

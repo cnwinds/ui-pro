@@ -1,8 +1,8 @@
-export type { AssetSource, ExportAsset } from './assets';
-export { referenceCropSource } from './assets';
+export type { AssetSource } from './assets';
+export { projectAssetSource, projectFonts } from './assets';
 export { GodotErrorCodes } from './errors';
 export type { ExportResult, ExportScreenOptions, ExportShotOptions } from './export';
-export { exportScreen } from './export';
+export { exportProjectScreen, exportScreen } from './export';
 export type { GodotInstall } from './godot';
 export {
   checkGodotVersion,
@@ -11,29 +11,45 @@ export {
   GODOT_ENV,
   isSupportedVersion,
   locateGodot,
+  MIN_VERSION,
   parseGodotVersion,
 } from './godot';
 export { assignNodeNames, toFileStem, toPascalCase } from './naming';
 export type {
   Approximation,
+  ApproximationKind,
   BuilderNode,
   BuilderSpec,
   ExportPlan,
   GodotClass,
+  MissingAsset,
+  PlannedAsset,
   PlannedNode,
+  PlanOptions,
   PropValue,
 } from './plan';
 export {
+  ART_SUFFIX,
+  anchorOf,
   assetFile,
-  godotClassOf,
+  fontFile,
+  layoutProps,
   planExport,
   sceneFile,
   screenDir,
   toResPath,
-  wantsAsset,
 } from './plan';
-export type { NewGodotProject, PreparedTarget } from './project';
-export { GODOT_PROJECT_FILE, inspectGodotTarget, prepareGodotProject } from './project';
+export type { GodotDisplaySettings, NewGodotProject, PreparedTarget } from './project';
+export {
+  GODOT_PROJECT_FILE,
+  inspectGodotTarget,
+  parseDisplaySettings,
+  prepareGodotProject,
+  readDisplaySettings,
+  STRETCH_ASPECT,
+  STRETCH_MODE,
+} from './project';
 export type { BuilderResult, ExportReport, ReportAsset, ReportConflict } from './report';
 export { parseBuilderResult } from './report';
-export { meanAbsDiff } from './shot';
+export type { ShotOptions } from './shot';
+export { meanAbsDiff, takeShot } from './shot';

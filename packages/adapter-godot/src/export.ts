@@ -1,27 +1,27 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   type DesignSize,
-  preOrder,
+  loadScreen,
+  type Project,
   readFileIfExists,
   type ScreenDoc,
   toPosix,
   UiProError,
   writeFileAtomic,
 } from '@ui-pro/core';
-import type { AssetSource } from './assets';
+import { type AssetSource, projectAssetSource, projectFonts } from './assets';
 import { GodotErrorCodes } from './errors';
 import { assertCleanRun, type GodotInstall, locateGodot, runGodot } from './godot';
-import { assetFile, type BuilderSpec, planExport, toResPath, wantsAsset } from './plan';
+import { type BuilderSpec, fontFile, planExport, sceneFile, toResPath } from './plan';
 import { inspectGodotTarget, prepareGodotProject } from './project';
 import {
   buildErrorMessage,
   conflictMessage,
   type ExportReport,
   parseBuilderResult,
-  type ReportAsset,
 } from './report';
 import { meanAbsDiff, takeShot } from './shot';
 
@@ -46,6 +46,12 @@ export interface ExportScreenOptions {
   /** Absolute path of the Godot project. */
   target: string;
   assets: AssetSource;
+  /** Font name -> absolute path of the font file; the ones the screen uses are copied in. */
+  fonts?: Readonly<Record<string, string>>;
+  /** Pixel-art style (the precheck's style profile): textures use nearest-texel sampling. */
+  pixelArt?: boolean;
+  /** Builds the scene from scratch instead of updating the one already there. */
+  freshScene?: boolean;
   /** Skips looking for Godot. */
   godot?: GodotInstall;
   env?: NodeJS.ProcessEnv;
@@ -95,19 +101,49 @@ export async function exportScreen(options: ExportScreenOptions): Promise<Export
   });
   const files = new Set(prepared.files);
 
-  const assets: ReportAsset[] = [];
-  for (const id of preOrder(doc)) {
-    const node = doc.nodes[id];
-    if (node === undefined || !wantsAsset(node)) continue;
-    const asset = await options.assets(node);
-    if (asset === undefined) continue;
-    const file = assetFile(doc.name, id);
-    await writeIfChanged(join(target, ...file.split('/')), asset.png);
-    assets.push({ id, file, approximate: asset.approximate === true });
+  // Every asset the screen's nodes name, read once; the plan decides which of them are drawn.
+  const manifest = options.assets.manifest;
+  const bytes = new Map<string, Uint8Array>();
+  const wanted = new Set<string>();
+  for (const node of Object.values(doc.nodes)) {
+    if (node.asset !== undefined) wanted.add(node.asset);
+    for (const state of Object.values(node.states ?? {})) {
+      if (state.asset !== undefined) wanted.add(state.asset);
+    }
+  }
+  for (const record of manifest?.assets ?? []) {
+    if (!wanted.has(record.name)) continue;
+    const content = await options.assets.read(record);
+    if (content !== null) bytes.set(record.name, content);
+  }
+
+  const fonts: Record<string, string> = {};
+  for (const node of Object.values(doc.nodes)) {
+    const name = node.text?.font;
+    const source = name === undefined ? undefined : options.fonts?.[name];
+    if (name === undefined || source === undefined || fonts[name] !== undefined) continue;
+    const file = fontFile(name, extname(source).toLowerCase());
+    await writeIfChanged(join(target, ...file.split('/')), await readFile(source));
+    fonts[name] = toResPath(file);
     files.add(file);
   }
+
+  const plan = planExport(doc, {
+    manifest,
+    files: new Set(bytes.keys()),
+    fonts,
+    pixelArt: options.pixelArt,
+  });
+  for (const asset of plan.assets) {
+    const content = bytes.get(asset.name);
+    if (content === undefined) continue;
+    await writeIfChanged(join(target, ...asset.file.split('/')), content);
+    files.add(asset.file);
+  }
   files.add(await copyAddonScript(target, BUILDER_SCRIPT));
-  if (options.shot) files.add(await copyAddonScript(target, SHOT_SCRIPT));
+  files.add(await copyAddonScript(target, SHOT_SCRIPT));
+  if (options.freshScene)
+    await rm(join(target, ...sceneFile(doc.name).split('/')), { force: true });
 
   const imported = await runGodot(
     install,
@@ -117,7 +153,6 @@ export async function exportScreen(options: ExportScreenOptions): Promise<Export
   );
   assertCleanRun('import', imported.run, imported.errors);
 
-  const plan = planExport(doc, new Set(assets.map((asset) => asset.id)));
   const built = await runBuilder(
     install,
     target,
@@ -136,7 +171,14 @@ export async function exportScreen(options: ExportScreenOptions): Promise<Export
     files: [...files].sort(),
     nodes: plan.planned,
     placeholders: plan.placeholders,
-    assets,
+    missingAssets: plan.missing,
+    assets: plan.assets.map((asset) => ({
+      name: asset.name,
+      file: asset.file,
+      origin: asset.record.origin,
+      nodes: asset.nodes,
+      approximate: asset.record.approximations.length > 0,
+    })),
     approximations: plan.approximations,
     created: built.result.created,
     updated: built.result.updated,
@@ -177,6 +219,25 @@ export async function exportScreen(options: ExportScreenOptions): Promise<Export
     };
   }
   return result;
+}
+
+/**
+ * Exports a screen of a UI-Pro project: its document, built assets and fonts. What `ui-pro
+ * export godot` and the engine gate both do; the callers differ in where the Godot project is.
+ */
+export function exportProjectScreen(
+  project: Project,
+  screen: string,
+  options: Omit<ExportScreenOptions, 'doc' | 'projectName' | 'design' | 'assets' | 'fonts'>,
+): Promise<ExportResult> {
+  return exportScreen({
+    doc: loadScreen(project, screen),
+    projectName: project.config.name,
+    design: project.config.design,
+    assets: projectAssetSource(project, screen),
+    fonts: projectFonts(project),
+    ...options,
+  });
 }
 
 /** Runs `builder.gd` on `spec`; spec and result travel through a scratch directory. */

@@ -2,7 +2,7 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { isUiProError } from '@ui-pro/core';
 import { describe, expect, it } from 'vitest';
-import { inspectGodotTarget, prepareGodotProject } from '../src';
+import { inspectGodotTarget, prepareGodotProject, readDisplaySettings } from '../src';
 import { useTempDirs } from './helpers';
 
 const makeDir = useTempDirs();
@@ -31,6 +31,35 @@ describe('prepareGodotProject', () => {
     expect(text).toContain('window/size/viewport_height=1920');
     expect(text).toContain('renderer/rendering_method="gl_compatibility"');
     expect(await readFile(join(dir, '.gitignore'), 'utf8')).toBe('.godot/\n');
+  });
+
+  it('scales the window of a new project with canvas_items and expand', async () => {
+    const dir = join(await makeDir(), 'godot');
+
+    await prepareGodotProject(dir, init);
+
+    expect(await readDisplaySettings(dir)).toEqual({
+      width: 1080,
+      height: 1920,
+      stretchMode: 'canvas_items',
+      stretchAspect: 'expand',
+    });
+  });
+
+  it('does not change the display settings of an existing project', async () => {
+    const dir = await makeDir();
+    const text = '[display]\n\nwindow/size/viewport_width=720\n';
+    await writeFile(join(dir, 'project.godot'), `config_version=5\n\n${text}`);
+
+    await prepareGodotProject(dir, init);
+
+    expect(await readFile(join(dir, 'project.godot'), 'utf8')).toBe(`config_version=5\n\n${text}`);
+    expect(await readDisplaySettings(dir)).toEqual({
+      width: 720,
+      height: undefined,
+      stretchMode: undefined,
+      stretchAspect: undefined,
+    });
   });
 
   it('creates a project in an empty directory', async () => {

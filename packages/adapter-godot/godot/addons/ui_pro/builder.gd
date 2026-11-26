@@ -6,20 +6,46 @@ const META_ID := "ui_pro_id"
 const META_BASE := "ui_pro_base"
 
 const ALLOWED_CLASSES := [
-	"Control", "TextureRect", "NinePatchRect", "TextureButton", "TextureProgressBar", "Label"
+	"Control", "TextureRect", "NinePatchRect", "TextureButton", "Button", "TextureProgressBar",
+	"Label"
 ]
-const TEXTURE_PROPERTY := {
-	"TextureRect": "texture",
-	"NinePatchRect": "texture",
-	"TextureButton": "texture_normal",
-	"TextureProgressBar": "texture_progress",
+## Texture keys of the spec -> the property that holds the texture, per class. A `Button` has no
+## textures: its states are `StyleBoxTexture` overrides, named here.
+const TEXTURE_KEYS := {
+	"TextureRect": {"texture": "texture"},
+	"NinePatchRect": {"texture": "texture"},
+	"TextureButton": {
+		"texture": "texture_normal",
+		"texture_pressed": "texture_pressed",
+		"texture_hover": "texture_hover",
+		"texture_disabled": "texture_disabled",
+		"texture_focused": "texture_focused",
+	},
+	"Button": {
+		"texture": "normal",
+		"texture_pressed": "pressed",
+		"texture_hover": "hover",
+		"texture_disabled": "disabled",
+	},
+	"TextureProgressBar": {"texture": "texture_under"},
 }
+const SIDES := [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]
+const ANCHORS := ["anchor_left", "anchor_top", "anchor_right", "anchor_bottom"]
 const OFFSETS := ["offset_left", "offset_top", "offset_right", "offset_bottom"]
 const PATCH_MARGINS := [
 	"patch_margin_left", "patch_margin_top", "patch_margin_right", "patch_margin_bottom"
 ]
+const BOX_MARGINS := [
+	"texture_margin_left", "texture_margin_top", "texture_margin_right", "texture_margin_bottom"
+]
+const BOX_EXPANDS := [
+	"expand_margin_left", "expand_margin_top", "expand_margin_right", "expand_margin_bottom"
+]
+const BUTTON_STYLES := ["normal", "pressed", "hover", "disabled"]
 const NODE_PROPERTY := {
 	"visible": "visible",
+	"tint": "self_modulate",
+	"texture_filter": "texture_filter",
 	"text": "text",
 	"h_align": "horizontal_alignment",
 	"v_align": "vertical_alignment",
@@ -43,10 +69,10 @@ const V_ALIGN := {
 	"center": VERTICAL_ALIGNMENT_CENTER,
 	"bottom": VERTICAL_ALIGNMENT_BOTTOM,
 }
-const COMMON_KEYS := ["name", "rect", "visible"]
+const COMMON_KEYS := ["name", "anchors", "rect", "visible"]
 const TEXT_ONLY_KEYS := [
-	"text", "h_align", "v_align", "font_size", "font_color", "outline_size", "outline_color",
-	"shadow_color", "shadow_offset", "shadow_size",
+	"text", "h_align", "v_align", "font", "font_size", "font_color", "outline_size",
+	"outline_color", "shadow_color", "shadow_offset", "shadow_size",
 ]
 
 var _root: Control
@@ -158,10 +184,12 @@ func _spawn(spec: Dictionary) -> void:
 	_dirty = true
 
 func _applies(node: Control, key: String) -> bool:
-	if key == "texture":
-		return TEXTURE_PROPERTY.has(node.get_class())
+	if key.begins_with("texture") and key != "texture_filter":
+		return TEXTURE_KEYS.get(node.get_class(), {}).has(key)
 	if key == "patch_margin":
-		return node.get_class() == "NinePatchRect"
+		return node.get_class() == "NinePatchRect" or node.get_class() == "Button"
+	if key == "expand":
+		return node.get_class() == "Button"
 	if TEXT_ONLY_KEYS.has(key):
 		return node.get_class() == "Label"
 	return true
@@ -351,8 +379,10 @@ func _decode(key: String, raw: Variant) -> Variant:
 			return H_ALIGN[raw]
 		"v_align":
 			return V_ALIGN[raw]
-		"font_size", "outline_size", "shadow_size":
+		"font_size", "outline_size", "shadow_size", "texture_filter":
 			return int(raw)
+		"tint":
+			return Color.html(raw)
 		_:
 			return raw
 
@@ -361,13 +391,21 @@ func _read(node: Control, key: String) -> Variant:
 	match key:
 		"name":
 			return str(node.name)
+		"anchors":
+			return ANCHORS.map(func(property: String) -> float: return node.get(property))
 		"rect":
 			return OFFSETS.map(func(property: String) -> float: return node.get(property))
 		"patch_margin":
+			if node.get_class() == "Button":
+				return _read_box(node, BOX_MARGINS)
 			return PATCH_MARGINS.map(func(property: String) -> float: return node.get(property))
-		"texture":
-			var texture := node.get(TEXTURE_PROPERTY[node.get_class()]) as Texture2D
-			return "" if texture == null else texture.resource_path
+		"expand":
+			return _read_box(node, BOX_EXPANDS)
+		"font":
+			var font := _settings(node).font
+			return "" if font == null else font.resource_path
+	if key.begins_with("texture") and key != "texture_filter":
+		return _read_texture(node, key)
 	if NODE_PROPERTY.has(key):
 		return node.get(NODE_PROPERTY[key])
 	return _settings(node).get(SETTINGS_PROPERTY[key])
@@ -378,16 +416,38 @@ func _write(node: Control, key: String, value: Variant) -> bool:
 		"name":
 			node.name = value
 			return true
+		"anchors":
+			# Moves the anchors only; the offsets are written next and are measured from them.
+			# Without pushing the opposite anchor Godot refuses a left anchor right of the right one.
+			for index in 4:
+				node.set_anchor(SIDES[index], value[index], false, true)
+			return true
 		"rect":
 			for index in 4:
 				node.set(OFFSETS[index], value[index])
 			return true
 		"patch_margin":
+			if node.get_class() == "Button":
+				_write_box(node, BOX_MARGINS, value, true)
+				return true
 			for index in 4:
 				node.set(PATCH_MARGINS[index], int(value[index]))
 			return true
-		"texture":
-			return _write_texture(node, value)
+		"expand":
+			_write_box(node, BOX_EXPANDS, value, false)
+			return true
+		"font":
+			var settings_ := _settings(node)
+			if settings_.resource_path != "" and not settings_.resource_path.contains("::"):
+				return false
+			var font := load(value) as Font
+			if font == null:
+				_error("font_missing", "cannot load the font %s" % value)
+				return true
+			settings_.font = font
+			return true
+	if key.begins_with("texture") and key != "texture_filter":
+		return _write_texture(node, key, value)
 	if NODE_PROPERTY.has(key):
 		node.set(NODE_PROPERTY[key], value)
 		return true
@@ -398,15 +458,55 @@ func _write(node: Control, key: String, value: Variant) -> bool:
 	return true
 
 
-func _write_texture(node: Control, path: String) -> bool:
+func _read_texture(node: Control, key: String) -> String:
+	var slot: String = TEXTURE_KEYS[node.get_class()][key]
+	var texture: Texture2D = null
+	if node.get_class() == "Button":
+		if node.has_theme_stylebox_override(slot):
+			var box := node.get_theme_stylebox(slot) as StyleBoxTexture
+			texture = null if box == null else box.texture
+	else:
+		texture = node.get(slot) as Texture2D
+	return "" if texture == null else texture.resource_path
+
+
+func _write_texture(node: Control, key: String, path: String) -> bool:
 	var texture: Texture2D = null
 	if path != "":
 		texture = load(path) as Texture2D
 		if texture == null:
 			_error("texture_missing", "cannot load the texture %s" % path)
 			return true
-	node.set(TEXTURE_PROPERTY[node.get_class()], texture)
+	var slot: String = TEXTURE_KEYS[node.get_class()][key]
+	if node.get_class() == "Button":
+		_box(node, slot).texture = texture
+	else:
+		node.set(slot, texture)
 	return true
+
+
+## The texture style box a `Button` draws one of its states with; made on first use. Every state
+## is overridden so that no theme style shows through.
+func _box(node: Control, style: String) -> StyleBoxTexture:
+	if node.has_theme_stylebox_override(style):
+		var existing := node.get_theme_stylebox(style) as StyleBoxTexture
+		if existing != null:
+			return existing
+	var box := StyleBoxTexture.new()
+	node.add_theme_stylebox_override(style, box)
+	return box
+
+
+func _read_box(node: Control, properties: Array) -> Array:
+	var box := _box(node, "normal")
+	return properties.map(func(property: String) -> float: return box.get(property))
+
+
+func _write_box(node: Control, properties: Array, value: Array, as_int: bool) -> void:
+	for style: String in BUTTON_STYLES:
+		var box := _box(node, style)
+		for index in 4:
+			box.set(properties[index], int(value[index]) if as_int else float(value[index]))
 
 
 func _settings(node: Control) -> LabelSettings:

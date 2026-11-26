@@ -2,14 +2,19 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  type AssetManifest,
+  type AssetRecord,
   attachChild,
   createScreenDoc,
   type NewNodeFields,
   newNode,
   type ScreenDoc,
+  sha256Hex,
   type UINode,
 } from '@ui-pro/core';
+import sharp from 'sharp';
 import { afterEach } from 'vitest';
+import type { AssetSource } from '../src';
 
 /** Registers cleanup for every directory the returned factory creates under the OS temp dir. */
 export function useTempDirs(): () => Promise<string> {
@@ -68,6 +73,81 @@ export function parseTscnNodes(
         body: rest.join('\n'),
       };
     });
+}
+
+export type Rgba = [number, number, number, number];
+
+/** A PNG filled with one colour. */
+export function solidPng(width: number, height: number, [r, g, b, a]: Rgba): Promise<Buffer> {
+  return sharp({
+    create: { width, height, channels: 4, background: { r, g, b, alpha: a / 255 } },
+  })
+    .png()
+    .toBuffer();
+}
+
+/** A PNG painted by `pixel(x, y)`. */
+export function paintedPng(
+  width: number,
+  height: number,
+  pixel: (x: number, y: number) => Rgba,
+): Promise<Buffer> {
+  const data = Buffer.alloc(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) data.set(pixel(x, y), (y * width + x) * 4);
+  }
+  return sharp(data, { raw: { width, height, channels: 4 } })
+    .png()
+    .toBuffer();
+}
+
+/** One hand-written asset: its pixels and what the manifest says about them. */
+export interface AssetInit {
+  name: string;
+  png: Buffer;
+  inset?: AssetRecord['inset'];
+  nineSlice?: AssetRecord['nineSlice'];
+  approximations?: string[];
+  origin?: AssetRecord['origin'];
+}
+
+/** Assets as the export reads them, kept in memory; every node that names one is a user. */
+export async function memoryAssets(doc: ScreenDoc, inits: AssetInit[]): Promise<AssetSource> {
+  const users = (name: string): string[] =>
+    Object.values(doc.nodes)
+      .filter(
+        (node) =>
+          node.asset === name || Object.values(node.states ?? {}).some((s) => s.asset === name),
+      )
+      .map((node) => node.id);
+  const assets: AssetRecord[] = [];
+  const files = new Map<string, Buffer>();
+  for (const init of inits) {
+    const meta = await sharp(init.png).metadata();
+    files.set(`${init.name}.png`, init.png);
+    assets.push({
+      name: init.name,
+      file: `${init.name}.png`,
+      origin: init.origin ?? 'crop',
+      uses: users(init.name).map((node) => ({ node })),
+      size: [meta.width ?? 0, meta.height ?? 0],
+      inset: init.inset ?? [0, 0, 0, 0],
+      ...(init.nineSlice ? { nineSlice: init.nineSlice } : {}),
+      holes: [],
+      steps: [{ step: 'extract', method: 'crop' }],
+      sha256: sha256Hex(init.png),
+      approximations: init.approximations ?? [],
+    });
+  }
+  const manifest: AssetManifest = {
+    format: 'ui-pro/assets',
+    version: 1,
+    screen: doc.name,
+    sourceSha256: doc.source.sha256,
+    inputsSha256: 'b'.repeat(64),
+    assets,
+  };
+  return { manifest, read: (record) => files.get(record.file) ?? null };
 }
 
 export function nodeAt(doc: ScreenDoc, id: string): UINode {

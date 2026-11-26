@@ -1,7 +1,9 @@
 extends SceneTree
 ## Renders a scene for a few frames and saves it as a PNG. Needs a window: headless mode does
 ## not render.
-## godot --path <project> --script res://addons/ui_pro/shot.gd -- <scene> <out.png> <width> <height>
+## godot --path <project> --script res://addons/ui_pro/shot.gd -- <scene> <out.png> <width> <height> [clear_color]
+## `clear_color` (html, e.g. #ff00ff) is what shows where nothing is drawn; the engine default
+## otherwise.
 
 const WARMUP_FRAMES := 5
 
@@ -12,8 +14,8 @@ var _frames := 0
 
 func _init() -> void:
 	var args := OS.get_cmdline_user_args()
-	if args.size() != 4:
-		print("ERROR: shot.gd expects <scene> <out.png> <width> <height>")
+	if args.size() != 4 and args.size() != 5:
+		print("ERROR: shot.gd expects <scene> <out.png> <width> <height> [clear_color]")
 		quit(2)
 		return
 	var scene := load(args[0]) as PackedScene
@@ -21,6 +23,8 @@ func _init() -> void:
 		print("ERROR: cannot load the scene ", args[0])
 		quit(2)
 		return
+	if args.size() == 5:
+		RenderingServer.set_default_clear_color(Color.html(args[4]))
 	_out = args[1]
 	_viewport = SubViewport.new()
 	_viewport.size = Vector2i(int(args[2]), int(args[3]))

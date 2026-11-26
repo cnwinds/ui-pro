@@ -19,6 +19,8 @@ export interface ShotOptions {
   out: string;
   width: number;
   height: number;
+  /** `#rrggbb` shown where nothing is drawn; the engine's default grey when absent. */
+  clearColor?: string;
   timeoutMs: number;
 }
 
@@ -46,6 +48,7 @@ export async function takeShot(options: ShotOptions): Promise<{ ms: number }> {
       options.out,
       String(options.width),
       String(options.height),
+      ...(options.clearColor === undefined ? [] : [options.clearColor]),
     ],
     options.timeoutMs,
   );

@@ -38,8 +38,9 @@ describe('ui-pro schema', () => {
       'exception.add',
       'exception.remove',
       'rule.recompute',
+      'asset.assign',
     ]);
-    expect(envelope.summary).toBe('共 25 个操作');
+    expect(envelope.summary).toBe('共 26 个操作');
     expect(envelope.next).toEqual(['ui-pro schema <op>  # 查看某个操作的参数']);
   });
 

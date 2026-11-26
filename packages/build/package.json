@@ -12,6 +12,7 @@
     "@ui-pro/psd": "workspace:*",
     "@ui-pro/renderer": "workspace:*",
     "@ui-pro/rules": "workspace:*",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "zod": "^4.6.7"
   }
 }

@@ -1,4 +1,13 @@
-import { parseRef } from '@ui-pro/core';
+import {
+  type AssetManifest,
+  type AssetRecord,
+  expectedHoles,
+  type Ownership,
+  parseRef,
+  pixelOwnership,
+  type ScreenDoc,
+  type UINode,
+} from '@ui-pro/core';
 import { collectAmbiguities, type Evaluation, evaluate } from './evaluate';
 import type { RuleInputs } from './inputs';
 import { getPoint, valueProblem } from './points';
@@ -159,6 +168,240 @@ function checkExceptions(inputs: RuleInputs): CheckProblem[] {
   return problems;
 }
 
+const NOT_BUILT = '还没有构建资产：运行 ui-pro build 完成资产构建后才能比对资产与决定是否相符';
+
+const decidedValue = (node: UINode, point: string): string | undefined =>
+  node.decisions[point]?.value;
+
+/** The decision point whose value made `node` draw inside another asset or not at all. */
+function bakedPoint(node: UINode): string {
+  if (decidedValue(node, 'attach.split') === 'baked') return 'attach.split';
+  if (decidedValue(node, 'decor.merge') === 'merge') return 'decor.merge';
+  return 'content.split';
+}
+
+/** An approximation starts with the decision point it is about: `occlusion.fill：…`. */
+function aboutPoint(approximation: string, point: string): boolean {
+  return approximation.startsWith(point) && /^\s*[：:]/.test(approximation.slice(point.length));
+}
+
+const instanceKey = (node: UINode): string | undefined =>
+  node.cluster !== undefined
+    ? `cluster:${node.cluster}`
+    : node.instanceOf !== undefined
+      ? `component:${node.instanceOf}`
+      : undefined;
+
+const holeKeys = (holes: ReadonlyArray<{ node: string; handling: string }>): Set<string> =>
+  new Set(holes.map((hole) => `${hole.node} ${hole.handling}`));
+
+function describeHoles(keys: Iterable<string>): string {
+  return [...keys].map((key) => key.replace(' ', '：')).join('、');
+}
+
+/**
+ * 无漂移 for one screen: the built assets are what the decisions call for. A difference the build
+ * recorded as an approximation of that decision point is a warning, anything else a problem.
+ */
+function driftOfScreen(
+  screen: string,
+  doc: ScreenDoc,
+  manifest: AssetManifest,
+  problems: CheckProblem[],
+  warnings: string[],
+): void {
+  const ownership: ReadonlyMap<string, Ownership> = pixelOwnership(doc);
+  const expected = expectedHoles(doc, ownership);
+  const byName = new Map(manifest.assets.map((asset) => [asset.name, asset]));
+
+  const report = (
+    kind: string,
+    message: string,
+    where: { node?: string; nodes?: string[] },
+    point: string | undefined,
+    records: readonly AssetRecord[] = [],
+  ) => {
+    const recorded =
+      point === undefined
+        ? undefined
+        : records
+            .flatMap((record) => record.approximations)
+            .find((entry) => aboutPoint(entry, point));
+    if (recorded !== undefined) {
+      warnings.push(`${message}（构建已记为近似项：${recorded}）`);
+      return;
+    }
+    problems.push({
+      kind,
+      message,
+      screen,
+      ...where,
+      ...(point === undefined ? {} : { point }),
+    });
+  };
+
+  const instances = new Map<string, string[]>();
+  for (const [id, owned] of ownership) {
+    const node = doc.nodes[id];
+    if (node === undefined || owned.kind !== 'asset') continue;
+    const key = instanceKey(node);
+    if (key !== undefined) instances.set(key, [...(instances.get(key) ?? []), id]);
+  }
+
+  for (const [id, owned] of ownership) {
+    const node = doc.nodes[id];
+    if (node === undefined) continue;
+    const ref = `${screen}/#${id}`;
+
+    if (owned.kind !== 'asset') {
+      const used =
+        node.asset !== undefined ||
+        Object.values(node.states ?? {}).some((state) => state.asset !== undefined) ||
+        manifest.assets.some((asset) => asset.uses.some((use) => use.node === id));
+      if (!used) continue;
+      const why =
+        owned.kind === 'baked'
+          ? `像素并入 #${owned.host} 的资产（${bakedPoint(node)}）`
+          : owned.kind === 'text'
+            ? '是动态文字，由引擎绘制'
+            : '本身没有像素';
+      report(
+        'unexpected-asset',
+        `节点 ${ref} ${why}，不该有自己的资产`,
+        { node: id },
+        owned.kind === 'baked' ? bakedPoint(node) : owned.kind === 'text' ? 'text.mode' : undefined,
+        manifest.assets.filter((asset) => asset.uses.some((use) => use.node === id)),
+      );
+      continue;
+    }
+
+    if (node.asset === undefined) {
+      report(
+        'missing-asset',
+        `节点 ${ref} 要画自己的资产，但没有绑定资产`,
+        { node: id },
+        undefined,
+      );
+      continue;
+    }
+    const record = byName.get(node.asset);
+    if (record === undefined) {
+      report(
+        'missing-asset',
+        `节点 ${ref} 绑定的资产 ${node.asset} 不在资产清单里`,
+        { node: id },
+        undefined,
+      );
+      continue;
+    }
+
+    const stretch = decidedValue(node, 'stretch.mode');
+    if ((stretch === 'nine-slice' || stretch === 'three-slice') && record.nineSlice === undefined) {
+      report(
+        'nine-slice',
+        `节点 ${ref} 的 stretch.mode 是 ${stretch}，但资产 ${record.name} 没有九宫格边距`,
+        { node: id },
+        'stretch.mode',
+        [record],
+      );
+    }
+
+    const defaultUses = record.uses.filter((use) => use.state === undefined);
+    const mine = defaultUses.find((use) => use.node === id);
+    const tinted = mine?.tint !== undefined || node.tint !== undefined;
+    const key = instanceKey(node);
+    const isInstance = key !== undefined && (instances.get(key)?.length ?? 0) > 1;
+    const mode = decidedValue(node, 'variant.mode');
+    if (isInstance && mode === 'tint') {
+      const shared = defaultUses.some((use) => use.node !== id);
+      if (!shared || !tinted) {
+        report(
+          'tint',
+          `节点 ${ref} 的 variant.mode 是 tint，应与同簇的实例共用一张资产并带乘色，但${
+            shared ? `共用的资产 ${record.name} 没有给它乘色` : `资产 ${record.name} 只有它自己在用`
+          }`,
+          { node: id },
+          'variant.mode',
+          [record],
+        );
+      }
+    }
+    if (isInstance && mode === 'variant-assets' && tinted) {
+      report(
+        'tint',
+        `节点 ${ref} 的 variant.mode 是 variant-assets，各实例应有自己的资产，但它带着乘色`,
+        { node: id },
+        'variant.mode',
+        [record],
+      );
+    }
+  }
+
+  for (const record of manifest.assets) {
+    const owners = record.uses.filter((use) => use.state === undefined).map((use) => use.node);
+    if (owners.length === 0) continue;
+    if (record.origin === 'layer') {
+      if (record.holes.length > 0) {
+        report(
+          'holes',
+          `资产 ${record.name} 由图层渲染而成，不该有补全的洞，但记了 ${record.holes.length} 个：${describeHoles(holeKeys(record.holes))}`,
+          { node: owners[0], nodes: owners },
+          undefined,
+        );
+      }
+      continue;
+    }
+    if (record.origin !== 'crop' && record.origin !== 'generated') continue;
+    const wanted = holeKeys(owners.flatMap((owner) => expected.get(owner) ?? []));
+    const actual = holeKeys(record.holes);
+    const missing = [...wanted].filter((key) => !actual.has(key));
+    const extra = [...actual].filter((key) => !wanted.has(key));
+    if (missing.length === 0 && extra.length === 0) continue;
+    const parts = [
+      ...(missing.length > 0 ? [`缺少 ${describeHoles(missing)}`] : []),
+      ...(extra.length > 0 ? [`多出 ${describeHoles(extra)}`] : []),
+    ];
+    report(
+      'holes',
+      `界面 ${screen} 的资产 ${record.name} 补全的洞与决定不符（节点：处理方式）：${parts.join('；')}`,
+      { node: owners[0], nodes: owners },
+      'occlusion.fill',
+      [record],
+    );
+  }
+}
+
+/**
+ * 无漂移: the built assets agree with the decisions. Skipped for screens that have not been built.
+ */
+function checkDrift(inputs: RuleInputs): CheckItem {
+  const problems: CheckProblem[] = [];
+  const warnings: string[] = [];
+  let checked = 0;
+  for (const [screen, { doc, assets }] of inputs.screens) {
+    if (assets === null || assets === undefined) continue;
+    checked++;
+    driftOfScreen(screen, doc, assets, problems, warnings);
+  }
+  if (checked === 0) {
+    return {
+      id: 'no-drift',
+      name: '无漂移',
+      status: 'skipped',
+      reason: NOT_BUILT,
+      problems: [],
+      warnings: [],
+    };
+  }
+  const unbuilt = [...inputs.screens]
+    .filter(([, input]) => input.assets === null || input.assets === undefined)
+    .map(([screen]) => screen);
+  if (unbuilt.length > 0) {
+    warnings.push(`界面 ${list(unbuilt)} 还没有构建资产，没有比对`);
+  }
+  return item('no-drift', '无漂移', problems, warnings);
+}
+
 /** 规则不回归: the examples of every rule still get the rule's value. */
 function checkRegressions(evaluation: Evaluation): {
   problems: CheckProblem[];
@@ -216,14 +459,7 @@ export function checkRules(inputs: RuleInputs): CheckReport {
   const items: CheckItem[] = [
     item('complete', '完备', checkComplete(inputs, evaluation)),
     item('unambiguous', '无歧义', checkUnambiguous(evaluation)),
-    {
-      id: 'no-drift',
-      name: '无漂移',
-      status: 'skipped',
-      reason: '尚未实现：要等资产构建能产出实际资产之后，才能比对资产与决定是否相符',
-      problems: [],
-      warnings: [],
-    },
+    checkDrift(inputs),
     item('cluster-consistency', '同形同判', checkClusters(inputs)),
     item('exceptions-justified', '例外有据', checkExceptions(inputs)),
     item('no-regression', '规则不回归', regressions.problems, regressions.warnings),

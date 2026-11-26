@@ -1,10 +1,12 @@
 import {
+  type AssetManifest,
   type DocKind,
   ErrorCodes,
   isUiProError,
   listScreens,
   loadScreen,
   type Project,
+  readAssetManifest,
   readFileIfExistsSync,
   resolveInside,
   type ScreenDoc,
@@ -18,6 +20,8 @@ import { emptyProjectRules, emptyScreenRules, type ProjectRules, type ScreenRule
 export interface ScreenInput {
   doc: ScreenDoc;
   rules: ScreenRules;
+  /** The screen's built assets; `null` or absent before the first build. */
+  assets?: AssetManifest | null;
 }
 
 /** Everything evaluation needs: the three rule layers and the screens they apply to. */
@@ -50,6 +54,7 @@ export function readRuleInputs(project: Project): RuleInputs {
         screenRulesKind.parse,
         emptyScreenRules,
       ),
+      assets: readAssetManifest(project, name),
     });
   }
   return {
@@ -89,7 +94,11 @@ export function txScreenRules(ctx: TxContext, screen: string): ScreenRules {
 export function readTxInputs(ctx: TxContext): RuleInputs {
   const screens = new Map<string, ScreenInput>();
   for (const name of listScreens(ctx.project)) {
-    screens.set(name, { doc: ctx.screen(name), rules: txScreenRules(ctx, name) });
+    screens.set(name, {
+      doc: ctx.screen(name),
+      rules: txScreenRules(ctx, name),
+      assets: ctx.assets(name),
+    });
   }
   return { pack: defaultPack(), project: txProjectRules(ctx), screens };
 }

@@ -30,9 +30,14 @@ export function parseWithSchema<S extends z.ZodType>(
   });
 }
 
+/** Drops the UTF-8 byte order mark that Windows PowerShell 5 and old editors write. */
+export function stripBom(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
 function parseJsonText(text: string, label: string): unknown {
   try {
-    return JSON.parse(text);
+    return JSON.parse(stripBom(text));
   } catch (cause) {
     throw new UiProError(ErrorCodes.docInvalid, `JSON 语法错误：${label}`, { cause });
   }

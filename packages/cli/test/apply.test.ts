@@ -46,6 +46,26 @@ describe('ui-pro apply', () => {
     expect(dataOf<Applied>(envelope).version).toBe(3);
   });
 
+  it('names the documents in the summary when no node changed', async () => {
+    const { cli } = await treeProject(makeDir);
+
+    const envelope = await cli.ok(
+      ['apply', '-'],
+      JSON.stringify([{ op: 'concept.define', name: '徽章' }]),
+    );
+
+    expect(envelope.summary).toBe('已提交 v3：改动 glossary.yaml');
+  });
+
+  it('accepts a file that starts with a UTF-8 byte order mark', async () => {
+    const { dir, cli } = await treeProject(makeDir);
+    await writeFile(join(dir, 'ops.json'), `\uFEFF${JSON.stringify(resizeTitle)}`);
+
+    const envelope = await cli.ok(['apply', 'ops.json']);
+
+    expect(dataOf<Applied>(envelope).version).toBe(3);
+  });
+
   it('accepts operations wrapped in { "ops": [...] }', async () => {
     const { cli } = await treeProject(makeDir);
 

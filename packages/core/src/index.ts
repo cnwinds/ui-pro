@@ -57,7 +57,7 @@ export * from './schema/candidates';
 export type { CanonicalOptions } from './schema/canonical';
 export { canonicalize } from './schema/canonical';
 export type { Codec } from './schema/codec';
-export { formatIssues, jsonCodec, parseWithSchema, yamlCodec } from './schema/codec';
+export { formatIssues, jsonCodec, parseWithSchema, stripBom, yamlCodec } from './schema/codec';
 export * from './schema/common';
 export * from './schema/project';
 export * from './schema/screen';

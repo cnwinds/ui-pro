@@ -1,6 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { type ApplyResult, applyOps, ErrorCodes, ioError, toPosix, UiProError } from '@ui-pro/core';
+import {
+  type ApplyResult,
+  applyOps,
+  ErrorCodes,
+  ioError,
+  stripBom,
+  toPosix,
+  UiProError,
+} from '@ui-pro/core';
 import type { CommandModule } from './types';
 
 interface ApplyCommandOptions {
@@ -18,7 +26,7 @@ function invalidBatch(message: string): UiProError {
 function parseBatch(text: string, label: string): unknown[] {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(stripBom(text));
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     throw invalidBatch(`${label} 不是合法的 JSON：${reason}`);
@@ -47,8 +55,12 @@ function summarize(result: ApplyResult): string {
     modified += Object.keys(screen.modified).length;
     removed += screen.removed.length;
   }
-  const counts = `节点新增 ${added}、修改 ${modified}、删除 ${removed}`;
-  const changed = result.changes.docs.length > 0;
+  const { docs } = result.changes;
+  const counts =
+    added + modified + removed === 0 && docs.length > 0
+      ? `改动 ${docs.join('、')}`
+      : `节点新增 ${added}、修改 ${modified}、删除 ${removed}`;
+  const changed = docs.length > 0;
   if (result.dryRun) return `预演通过（未写入）：${changed ? counts : '没有变化'}`;
   if (result.version === undefined) return '没有产生任何变化，未创建新版本';
   return `已提交 v${result.version}：${counts}`;

@@ -1,0 +1,9 @@
+{
+  "tier": "local",
+  "method": "lama",
+  "measured": {
+    "color": "#ffead9",
+    "size": 11
+  },
+  "warnings": []
+}

@@ -1,6 +1,6 @@
 # 07 像素能力
 
-Status: ready-for-agent
+Status: resolved
 
 先读 `../spec.md`，其中的共享接口、并行规则对本工单同样适用。
 
@@ -124,3 +124,70 @@ Status: ready-for-agent
   输出存到 `.scratch/m1-batch3/ref/pixel/`，父 agent 会看图。
 - 真实云端测试只在 `UI_PRO_CLOUD=1` 且有密钥时跑：一次局部重绘。
 - 在 Comments 里报告：首次下载各模型的耗时、每次推理的耗时（CPU，本机）、`grabCut` 是否可用、`catalog.ts` 里核实后更正了什么。
+
+## Comments
+
+### 交付说明（子 agent，2026-11-26）
+
+**做了什么**：验收清单全部完成，只改了归属内的文件。
+
+- `packages/perception/src/models/`：`store.ts`（`createModelStore`：HF_ENDPOINT / 内置镜像依次尝试、唯一 `.part`、10% 或 2 秒一条中文进度、大小 + sha256 校验、原子改名、`<文件>.verified.json` 记录校验结果、同进程并发下载合并、超过 24 小时的残留 `.part` 清理、无数据 30 秒放弃、失败抛 `E_MODEL_UNAVAILABLE` 并给 `HF_ENDPOINT` / 手动下载提示）、`session.ts`（每进程每模型只建一次 ONNX 会话；`UI_PRO_ORT_EP=dml` 试 DirectML，失败退回 CPU）。
+- `packages/perception/src/pixel/`：`extract`（hint / contour / grabcut / anime-seg / ink，柔边 + 去色边，像素风硬边）、`fill`（解析 → LaMa → 云端）、`stripText`（墨迹外扩 2px、量样式、按补全三层填）、`upscale`（重采样 → 本地 realesr 分块 → 云端；SSIM 低于 0.9 退回）、`dashscope.ts`（`createCloudImageModel` 的 DashScope 实现，异步任务、限流退避、轮询总超时）、`cloud-fill.ts`（八条约束）、`lock.ts`、`compose.ts`、`text-style.ts` 及若干像素工具。`types.ts` 没动。
+- 测试：`test/pixel/`（extract、fill、strip-text、upscale、cloud-fill、dashscope、primitives、`models.integration.test.ts`）、`test/models/store.test.ts`。`pnpm vitest run packages/perception/test/pixel packages/perception/test/models`：124 通过、5 跳过（4 个本地模型集成测试 + 1 个真实云端测试，各自要 `UI_PRO_MODELS=1` / `UI_PRO_CLOUD=1`）。`UI_PRO_MODELS=1` 跑了集成测试，4 个全过。`pnpm -s typecheck` 通过；自己的路径 biome 无告警。
+
+**没做 / 没验证**
+
+- 真实云端调用：本机没有 `DASHSCOPE_API_KEY`，只用假 `fetch` 测试，协议按本工单的“接口事实”实现，**没有对真实服务验证过**。真实云端测试（`UI_PRO_CLOUD=1`）已写好但本机没跑。
+- `UI_PRO_ORT_EP=dml` 的代码路径没在本机验证过（只验证了 CPU）。
+
+**实测数据（本机，CPU，onnxruntime-node 1.31.1）**
+
+| 模型 | 首次下载 | 会话创建（每进程一次） | 每次推理 |
+| --- | --- | --- | --- |
+| realesr-animevideov3（2.5 MB） | 2.1 秒 | 0.07 秒 | 每块 256×256 约 0.3–0.4 秒；200×290 图 2 块共约 0.8–1.1 秒 |
+| anime-seg（176 MB） | 48.7 秒 | 0.36 秒 | 1024×1024 约 1.0–1.1 秒 |
+| LaMa（208 MB） | 56.2 秒 | **15–24 秒** | 512×512 约 2.0–3.0 秒 |
+
+- 端到端：去掉装备框上的“+5”，进程里第一次 ≈ 21.7 秒（其中约 20 秒是 LaMa 建会话），之后同进程每次 ≈ 2.1–2.3 秒。
+- LaMa 会话创建慢，换图优化级别救不了（同一台机器、各跑一次：`extended` 16 秒、`all` 19 秒、`basic` 20 秒，`disabled` 反而 30 秒；默认用 `all`）。没有试预先优化再落盘的模型文件。这是**每个 `ui-pro build` 进程**要付一次的成本，只有用到 LaMa（解析填充满足不了）时才付。
+- `grabCut` **可用**：opencv.js 4.9 里有 `cv.grabCut`（80×80 约 14 ms）。所以 `ui` 的 GrabCut 回退已实现并有测试（低对比度的合成图走到 `grabcut`，IoU 0.97）。
+
+**`catalog.ts` 更正了什么**（只改了 `io` 说明，`bytes` / `sha256` 经下载校验确认无误）：
+
+- LaMa：输出张量 `output` 是 **0–255，不是 0–1**（原来的说明没写范围，按 0–1 处理会得到一片白）；补了张量名 `image` / `mask` / `output`，批维是动态的（`batch`）。`onnx-runner.ts` 按实际范围自动判断。
+- realesr：张量名 `input` / `output`，输出范围约 [−0.03, 1.03]，要裁剪。
+- anime-seg：输入名 `img`（固定 1×3×1024×1024，RGB [0,1]，方形，代码里按等比缩放居中加黑边），输出名 `mask`（1×1×1024×1024，[0,1]）。原来写的是“见 README”。
+
+**产出的图**（`.scratch/m1-batch3/ref/pixel/`，父 agent 可以看）：`lama-strip-plus5.png`（左原图右结果：“+5”去掉了，橘色徽章还在）、`lama-fill-edge.png`、`esrgan-icon.png`（左 Lanczos 右模型）、`esrgan-piece-after.png` / `esrgan-piece-lanczos.png`（两块拼接，没有接缝）、`animeseg-figure-over-magenta.png`（原图 | 抠出的角色衬在品红上）、`animeseg-figure.png`、`timings.json`、`lama-strip-plus5-measured.json`。
+
+**与工单的偏差和我做的决定（请父 agent 看一下）**
+
+1. **云端候选全被淘汰时，本地结果锁在“云端请求的键”下**（`by: 'local:lama'`，返回里带中文警告，不报错）。这样重新构建既不再调云端，`--locked` 也能复现。**服务本身失败**（HTTP 错误、任务 `FAILED`、全部结果都是 `{code,message}`）则抛 `E_CLOUD_IMAGE`，不静默退回——两种情况是我区分的，工单只写了前一种；06 要不要把后一种降级成本地，由构建决定。
+2. 外发记录在调用服务**之前**写（保守：失败的调用也留痕）；预算检查在查锁定**之后**、调用**之前**，所以已锁定的输出不受预算限制。
+3. 过渡带怎么算：洞内边缘 2–4 像素（本地 2、云端 3）从**洞外最近像素的颜色**渐变到生成的像素，不是从洞里原来的内容渐变（那是要去掉的东西，会留鬼影）。洞外字节与输入完全相同，每一层都有测试。像素风不羽化。
+4. 锁定内容：锁定的 PNG 是请求大小的整张结果图（RGBA）；复用时只在洞内贴回，所以洞外仍与输入一致。落选候选也是整张合成图。请求键 = sha256（操作、模型、参数、输入尺寸 + 原始像素）；本地模型的标识是 `local:<名>@<sha 前 12 位>`。
+5. `stripText` 的云端走“带遮罩的局部重绘”（外发记录的 `purpose` 是 `remove-text`），没用不带遮罩的去文字接口；`CloudImageModel.removeText` 在 DashScope 里仍按原始接口实现了。
+6. 给测试加了可选参数，不影响 06 的调用：`createPixelOps(context, { runner? })`、`createModelStore` 多了 `env` / `catalog` / `fetch` / `stallMs`、`createCloudImageModel(config, env, { fetch, pollMs, timeoutMs, retries, sleep })`。06 现在传的 `{ onProgress, env }` 照常工作。
+7. 本地超分只处理不超过 200 万像素的图，更大的退回重采样并警告（常量 `MAX_LOCAL_PIXELS`）。
+8. 最终回退也会锁：本地超分的 SSIM 低于 0.9 时退回重采样，这个结果同样锁定（`by: 'local:resample'`），保证 `--locked` 重建得到同一张图。
+
+**已知局限**
+
+- 字号由字形高度除以 0.72（大写字母和数字的字高占比）换算，方块字（CJK）字形更满，估出来偏小；描边只认宽度 ≤ 6 的外圈；阴影偏移只认 ±6 内；阴影模糊是边缘过渡宽度的粗估，不到 1.2 像素不报。2 像素宽的描边会混入抗锯齿，量出的颜色偏淡，3 像素以上准确。
+- 文字在徽章/按钮上、徽章只比文字大几个像素时（例如“+5”），背景色改取文本框内侧一圈，并只保留文本框外 1 像素内的墨迹，否则整个徽章会被当成文字（集成测试里第一版就是这样把徽章整个抹掉的）。框与真实文字相差超过 3 像素时这个策略会失准。
+- LaMa 的上下文是洞外接框的 2.5 倍（至少各边多 16 像素），洞很大或形状极端时质量会下降；这只是初稿，终稿靠云端。
+
+### 审核（父 agent）
+
+通过。
+
+- 看了 `ref/pixel/` 的图：LaMa 去掉“+5”后徽章底保留、边缘无残影；anime-seg 抠出的角色衬在品红上没有背景色残留；Real-ESRGAN 明显比 Lanczos 清晰。
+- 复跑 `UI_PRO_MODELS=1 pnpm vitest run packages/perception/test/pixel packages/perception/test/models`：128 通过、1 跳过（真实云端）。全仓 `pnpm -s typecheck` 通过，归属内 biome 无告警。
+- 密钥只从 `DASHSCOPE_API_KEY` 读；错误详情只带状态码、任务号、请求号；取结果图时不带 `Authorization`，密钥不会发到对象存储的域名。
+- 云端只在 `quality: 'final'`、有云端模型、外发档位不是 `local` 时调用（`fill`、`upscale` 两处）；顺序是查锁定 → `allowNew` → 预算 → 外发记录 → 调用，与约束一致。
+- 偏差 1–8 都接受。其中第 1 条留给 06：服务本身失败抛 `E_CLOUD_IMAGE`，构建决定是否退回本地并记近似项。
+
+留到后面的事：
+
+- 字号按 0.72 的字高占比换算，中文字形更满，量出来会偏小。糖果骑士全是中文，06 若用 `stripText` 量出的字号写 `text.size`，端到端联调时要核对。
+- LaMa 每个构建进程首次建会话 15–24 秒，M1 可以接受；以后可以试预先优化后落盘的模型文件。

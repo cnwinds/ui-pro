@@ -28,7 +28,7 @@ export const MODEL_CATALOG: Readonly<Record<ModelName, ModelSpec>> = {
     sha256: '1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6',
     bytes: 208_044_816,
     license: 'Apache-2.0',
-    io: 'image 1x3x512x512 float32 in [0,1] RGB; mask 1x1x512x512 float32, 1 = hole; output 1x3x512x512',
+    io: 'inputs `image` Nx3x512x512 float32 in [0,1] RGB and `mask` Nx1x512x512 float32 (1 = hole); output `output` Nx3x512x512 float32 in 0-255, not 0-1 (measured with onnxruntime-node 1.31)',
   },
   'realesr-animevideov3': {
     name: 'realesr-animevideov3',
@@ -39,7 +39,7 @@ export const MODEL_CATALOG: Readonly<Record<ModelName, ModelSpec>> = {
     sha256: '139f166bd2b955c7d4cd31ca2616eb97dacc4365c1c315d880735ce72a0663d9',
     bytes: 2_494_775,
     license: 'BSD-3-Clause',
-    io: 'fixed 1x3x256x256 float32 in [0,1] RGB, NCHW -> 1x3x1024x1024 (4x); tile larger images',
+    io: 'input `input` fixed 1x3x256x256 float32 in [0,1] RGB, NCHW; output `output` 1x3x1024x1024 (4x) in about [-0.03,1.03], clip it; tile larger images',
   },
   'anime-seg': {
     name: 'anime-seg',
@@ -50,7 +50,7 @@ export const MODEL_CATALOG: Readonly<Record<ModelName, ModelSpec>> = {
     sha256: 'f15622d853e8260172812b657053460e20806f04b9e05147d49af7bed31a6e99',
     bytes: 176_069_933,
     license: 'Apache-2.0',
-    io: 'see the skytnt/anime-seg README: RGB float32 in [0,1], square input (1024), one-channel mask out',
+    io: 'input `img` fixed 1x3x1024x1024 float32 in [0,1] RGB (letterbox to a square); output `mask` 1x1x1024x1024 float32 in [0,1], the character opacity',
   },
 };
 

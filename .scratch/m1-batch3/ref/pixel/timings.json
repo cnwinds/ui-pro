@@ -1,0 +1,8 @@
+{
+  "stripText +5 (first call in the process: LaMa session creation + run)": 22525,
+  "fill 22x26 hole (LaMa session already created: run only)": 2520,
+  "fill 22x26 hole (LaMa run only, another hole)": 2446,
+  "upscale 64x64 icon x3 (first call: session + 1 tile)": 620,
+  "upscale 200x290 piece x2 (2 tiles)": 1146,
+  "extract figure 200x235 (first call: session + run)": 2028
+}

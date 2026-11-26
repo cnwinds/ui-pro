@@ -1,6 +1,6 @@
 # 01 规则引擎与默认规则包
 
-Status: ready-for-agent
+Status: resolved
 
 先读 `../spec.md`，其中的并行规则和共享接口对本工单同样适用。
 
@@ -87,3 +87,72 @@ Status: ready-for-agent
 - 默认规则包对每个决策点都是全函数：写一个测试，对每种基元类型、每个通用角色构造节点，断言所有适用决策点都有决定。
 
 ## Comments
+
+### 交付说明（实现代理）
+
+**做了什么**
+
+- `packages/rules`：规则文档 schema 与两类 `DocKind`（`rules/project.yaml`、`screens/<界面>/rules.yaml`，`INITIAL_*` 能解析）；18 个决策点的目录（取值集合 + 适用范围）；17 个键的 `when` 条件语言（文档在 `packages/rules/README.md`）；通用角色表与默认可变性；节点事实的纯函数计算（附着、位置、形状、等距、重复、跨界面等，阈值是 `src/facts.ts` 的常量）；三层求值（界面 → 项目 → 默认规则包，节点例外压过全部，具体度 = 谓词个数，歧义不写决定，停用，兜底规则受保护）；默认规则包 44 条（每个决策点恰有一条无条件兜底 + §5.4 推导出的规则）；`beforeCommit`（重算全部 `decisions`，清理失效的节点例外并警告，歧义警告）与 `rename` 钩子；操作 `rule.propose`、`rule.adopt`、`rule.disable`、`rule.enable`、`rule.remove`、`exception.add`、`exception.remove`、`rule.recompute`；`rules check` 六项、`rules lint`、`rules list`、`rules why` 的库函数；幂等的 `registerRules(registry)`。
+- `packages/cli/src/commands/rules.ts`：`ui-pro rules list | why | check | lint`（替换占位）。`packages/cli/src/plugins.ts`：加了一行 `registerRules(defaultRegistry)` 和对应两行 import。
+- 测试：`packages/rules/test` 8 个文件 130 条（含原有的 smoke），`packages/cli/test/rules.test.ts` 20 条，共 150 条全部通过。
+
+**验收对照**
+
+- `treeProject` 上任何一次 `apply` 之后，每个适用决策点都有决定，`by` 全部是 `*@default`（CLI 测试和包内测试各一条）。
+- §5.5 红点流程：`#badge_dot` 默认 `attach.split = independent`（`attach.varies-independent@default`）；`rule.propose` 一条概念“红点”烘焙的项目规则，返回影响清单（`main/#badge_dot 的 attach.split：independent → baked`）和 `scope` 提问（`project`/`screen`/`node`，默认 `project`），不改任何决定；`rule.adopt --dry-run` 的 `changes` 里 `badge_dot` 的 `decisions` 在变；正式执行后改变；`history undo` 后恢复。包内测试里还有一条用角色条件的版本。
+- 歧义：`rules check` 失败（`E_RULES_CHECK`），`details.checks` 里 `无歧义` 的问题列出两条规则和受影响的节点。
+- 节点例外无理由被拒绝（`E_OP_INVALID`）；改名后例外跟着走；删除节点后例外移除并警告。
+- 同一相似簇里事实相同的节点得到相同的决定（引擎是纯函数，另有 2 万组随机事实的“默认规则包永不歧义”测试和按基元类型 × 通用角色的全函数测试）。
+- `rules lint` 抓出默认规则包里的概念、品类词、坐标、像素尺寸、非通用角色、样例、缺失或重复的兜底规则。
+
+**实测数据**
+
+- 默认规则包 44 条，覆盖 18 个决策点，每点一条兜底。
+- `treeProject`：7 个节点共 49 个决定。
+- 一个 402 节点的界面：`evaluate` 8 ms，`checkRules` 14 ms，无变化的 `rule.recompute` 提交 149 ms。同一界面 401 次 `node.add` 的一次 `apply` 用 2.4 s，时间花在核心逐条操作后的整界面校验上，与规则钩子无关（钩子只在提交前跑一次）。
+
+**与工单不一致或超出的地方**
+
+- 多做了 `rule.enable`（恢复被停用的规则）和 `rule.recompute`（空操作，靠 `beforeCommit` 刷新；手工改过规则文件后用）。`rule.remove`、`exception.remove` 按工单允许加上。
+- `rename` 钩子除了节点例外，还会改写规则（项目规则、待定区、界面规则）的 `examples`，否则改名后“规则不回归”会找不到样例。
+- `rule.adopt` 的 `scope` 只收 `project`/`screen`；“仅这一个节点”走 `exception.add`（`rule.propose` 的提问里三个选项都有）。
+- 工单没有规定 `when` 的全部键，我定了 17 个：`type role concept varies interactive textKind repeat parentType parentRole attached overVariable position shape childrenEven touchSmall lowRes crossScreen`，几何的定义和阈值写在 README 与 `src/facts.ts`。
+- 默认规则包里依赖测量的取值不替项目做主：`variant.mode` 兜底 `variant-assets`（`tint` 要等着色还原达标，由项目规则改），`fill.mode` 兜底 `clip`，`state.source` 兜底 `derive`（`generate` 由项目规则改），`stretch.mode` 只在 `varies: size` 时 `nine-slice`，不推 `three-slice`。
+- 错误码在本包定义：`E_RULE_INVALID`（决策点或取值不合法，也用于不能停用界面规则）、`E_RULE_NOT_FOUND`、`E_RULE_EXISTS`、`E_RULE_PROTECTED`、`E_RULES_CHECK`、`E_RULES_LINT`。参数本身不合法（缺 `because` 等）仍是核心的 `E_OP_INVALID`。
+- `rules list`、`rules why` 加了 `--limit`/`--offset`（`list`）与 `--limit`（`why`），沿用 `query` 的分页习惯。
+- “同形同判”检查做的是：同一相似簇的节点基元类型和通用角色必须一致；事实相同则决定相同由引擎保证并有测试。核心里目前没有“簇被拆分”的记录，所以没有检查“拆分后各部分的决定是否一致”。
+- “规则不回归”：样例节点已不存在只给警告；`rule.propose`/`rule.adopt` 里写了不存在的样例节点则直接拒绝。
+- “无漂移”按工单报告为 `skipped`，原因写明要等资产构建。
+
+**没做的**
+
+- 无漂移检查（依赖第 3 批资产构建）。
+- `ui-pro rules` 没有写规则的子命令；增删规则一律走 `ui-pro apply`，与工单一致。
+
+**需要父 agent 决定**
+
+1. 上面几个依赖测量的兜底取值（`variant.mode`、`fill.mode`、`state.source`）要不要改成更激进的默认。
+2. 是否把 `rules check` 的“完备”接进 `ui-pro verify` 或 `build` 的前置检查（现在只在 `rules check` 里）。
+3. 核心是否要给“簇拆分”留数据结构，好让“同形同判”能覆盖到。
+
+**对非本人文件的修改请求**
+
+- 核心：不需要改动，全部绕过。
+- `packages/cli/test/helpers.ts` 的 `treeProject` 应在播种前调用 `registerPlugins()`。现在播种用的是默认注册表，进程里第一次 `runCli` 之前还没有规则钩子，所以每个测试文件的第一个测试播种出的节点没有 `decisions`，随后的第一次 `apply` 会一次改动全部节点；`apply.test.ts` 的第一条测试因此对“修改 1”的断言会失败（之后的测试因为已注册而通过，依赖执行顺序）。
+- `packages/cli/test/schema.test.ts` 的“lists every operation”断言只有 14 个操作，现在多了 8 个 `rules` 族操作（共 22 个），要更新断言和 `共 14 个操作`。
+- 这两条是现在仅有的已知回归，我没有改这些文件。另外 `packages/psd/test/fixtures.ts(125,15)` 有一个类型错误，不是本工单的文件。
+
+### 审核（父 agent）
+
+通过。求值（节点例外压过规则层、只在有匹配的最高层里按条件数比较、并列不同值即歧义、与书写顺序无关）、默认规则包（每点一条兜底、条件只用通用事实）、钩子与操作都与工单一致。在临时项目上用示例图手动走了一遍 §5.5 红点流程：`rules why` → `rule.propose`（影响清单 + scope 提问）→ `rule.adopt --dry-run` → 采纳 → `rules check` → `history undo`，结果都对。
+
+对“需要父 agent 决定”的答复：
+
+1. 依赖测量的兜底值（`variant.mode`、`fill.mode`、`state.source`）维持保守。测量要到第 3 批才有，现在没有依据做更激进的默认。
+2. “完备”“无歧义”接进第 3 批 `build` 的前置检查：资产构建依赖决定，有歧义或缺决定时拒绝构建。
+3. 核心暂不加“簇拆分”的数据结构，等出现拆分操作时再加。
+
+审核时的改动：
+
+- 按你的请求修了两处回归：`packages/cli/test/helpers.ts` 的 `treeProject` 先调用 `registerPlugins()` 再播种；`schema.test.ts` 的操作清单更新到 22 个。
+- 留给第 3 批：决定之间有联动（例如红点改为 `attach.split = baked` 后，`occlusion.fill` 仍是 `fill`），资产构建要把相关决定放在一起解释，不能逐条照做。

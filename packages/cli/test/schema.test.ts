@@ -27,8 +27,16 @@ describe('ui-pro schema', () => {
       'layout.set',
       'state.set',
       'bind.set',
+      'rule.propose',
+      'rule.adopt',
+      'rule.disable',
+      'rule.enable',
+      'rule.remove',
+      'exception.add',
+      'exception.remove',
+      'rule.recompute',
     ]);
-    expect(envelope.summary).toBe('共 14 个操作');
+    expect(envelope.summary).toBe('共 22 个操作');
     expect(envelope.next).toEqual(['ui-pro schema <op>  # 查看某个操作的参数']);
   });
 

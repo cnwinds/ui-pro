@@ -7,6 +7,7 @@ import { addScreen, applyOps, createProject, type Project } from '@ui-pro/core';
 import sharp from 'sharp';
 import { afterEach, expect } from 'vitest';
 import { type Envelope, type FailureEnvelope, runCli, type SuccessEnvelope } from '../src';
+import { registerPlugins } from '../src/plugins';
 
 /** Registers cleanup for every directory the returned factory creates under the OS temp dir. */
 export function useTempDirs(): () => Promise<string> {
@@ -135,9 +136,11 @@ export interface TreeProject {
  *     |  `- badge_dot (image, concept 红点)
  *     `- title (text)
  *
- * History holds v1 (screen added) and v2 (tree seeded).
+ * History holds v1 (screen added) and v2 (tree seeded). The seed goes through the plugins'
+ * hooks, as a CLI commit would, so the nodes already carry their decisions.
  */
 export async function treeProject(makeDir: () => Promise<string>): Promise<TreeProject> {
+  registerPlugins();
   const root = await makeDir();
   const dir = join(root, 'proj');
   const project = await createProject(dir, { name: 'demo' });

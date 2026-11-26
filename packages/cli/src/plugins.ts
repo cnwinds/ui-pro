@@ -1,3 +1,6 @@
+import { defaultRegistry } from '@ui-pro/core';
+import { registerRules } from '@ui-pro/rules';
+
 let registered = false;
 
 /**
@@ -7,4 +10,5 @@ let registered = false;
 export function registerPlugins(): void {
   if (registered) return;
   registered = true;
+  registerRules(defaultRegistry);
 }

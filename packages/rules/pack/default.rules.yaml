@@ -1,0 +1,260 @@
+# 默认规则包：随产品发布的最低一层规则，格式与 rules/project.yaml 相同。
+# 只用基元类型、通用角色、可变性、几何关系、文字种类、重复性和是否交互做条件；
+# 不出现概念、品类词、具体文案或坐标（rules lint 强制检查）。
+# 每个决策点有一条不带条件的兜底规则（id 以 fallback 结尾），它不能被停用。
+format: ui-pro/rules
+version: 1
+rules:
+  # ---- attach.split：附着在宿主上的小元素是否独立 ----
+  - id: attach.varies-independent
+    point: attach.split
+    when: { varies: non-empty }
+    value: independent
+    because: 运行时会独立变化的元素烘焙进宿主后无法单独控制
+  - id: attach.interactive-independent
+    point: attach.split
+    when: { interactive: true }
+    value: independent
+    because: 可交互的元素要有自己的节点才能接收输入
+  - id: attach.fallback
+    point: attach.split
+    when: {}
+    value: baked
+    because: 既不可变又不交互的附着元素随宿主一起出图，不占独立节点
+
+  # ---- content.split：容器与里面的内容是否分开 ----
+  - id: content.varies-separate
+    point: content.split
+    when: { varies: content }
+    value: separate
+    because: 内容会被替换，容器与内容必须分开出图
+  - id: content.fallback
+    point: content.split
+    when: {}
+    value: baked
+    because: 内容不会变化时，容器与内容出成同一张图
+
+  # ---- decor.merge：不变的装饰是否并入所在背景 ----
+  - id: decor.static-merge
+    point: decor.merge
+    when: { varies: empty, interactive: false, overVariable: false }
+    value: merge
+    because: 不交互、不可变、不压在可变元素上的装饰，并入所在背景即可
+  - id: decor.fallback
+    point: decor.merge
+    when: {}
+    value: separate
+    because: 只要有一项条件不满足，装饰就保持独立，避免把会变化或要响应输入的像素画死在背景里
+
+  # ---- occlusion.fill：被独立元素遮住的区域是否补全 ----
+  - id: occlusion.fill-when-hideable
+    point: occlusion.fill
+    when: { varies: [visibility, motion, content] }
+    value: fill
+    because: 遮挡物可隐藏、可移动或可替换时，它遮住的区域必须补全，否则移开后会露出空洞
+  - id: occlusion.fallback
+    point: occlusion.fill
+    when: {}
+    value: none
+    because: 遮挡物固定不变时，被遮住的区域不会露出来，不必补全
+
+  # ---- text.mode：文字怎么实现 ----
+  - id: text.role-title-bitmap
+    point: text.mode
+    when: { role: title }
+    value: bitmap
+    because: 艺术字的字形无法由字体还原，保留位图
+  - id: text.kind-title-bitmap
+    point: text.mode
+    when: { textKind: title }
+    value: bitmap
+    because: 艺术字的字形无法由字体还原，保留位图
+  - id: text.fallback
+    point: text.mode
+    when: {}
+    value: dynamic
+    because: 数值和普通标签用动态文本，内容与语言都能随数据变化
+
+  # ---- repeat.mode：重复元素怎么组织 ----
+  - id: repeat.cluster-component
+    point: repeat.mode
+    when: { repeat: { min: 2 } }
+    value: component
+    because: 同形实例不少于 2 个时提取为组件，改一处全部同步
+  - id: repeat.fallback
+    point: repeat.mode
+    when: {}
+    value: independent
+    because: 只有一个实例时没有重复可言，保持独立节点
+
+  # ---- variant.mode：同结构不同颜色的变体怎么做 ----
+  - id: variant.fallback
+    point: variant.mode
+    when: {}
+    value: variant-assets
+    because: 各存一张最稳妥；着色还原经测量达标的变体，由项目规则改为 tint
+
+  # ---- stretch.mode：底板怎么适应尺寸 ----
+  - id: stretch.size-nine-slice
+    point: stretch.mode
+    when: { varies: size }
+    value: nine-slice
+    because: 尺寸会变化的底板用九宫拉伸，边角不变形
+  - id: stretch.fallback
+    point: stretch.mode
+    when: {}
+    value: fixed
+    because: 尺寸不变的底板保持原尺寸
+
+  # ---- fill.mode：进度类的填充方式 ----
+  - id: fill.square-radial
+    point: fill.mode
+    when: { shape: square }
+    value: radial
+    because: 长宽接近的进度类按环形填充
+  - id: fill.fallback
+    point: fill.mode
+    when: {}
+    value: clip
+    because: 条形进度用裁剪显示填充，两端的圆角不会被拉伸变形
+
+  # ---- state.source：图里没画的状态从哪来 ----
+  - id: state.fallback
+    point: state.source
+    when: {}
+    value: derive
+    because: 图里没画的状态先由缩放、变暗、去色得到；需要真实绘制时由项目规则改为 generate
+
+  # ---- press.feedback：可点击元素的默认按压反馈 ----
+  - id: press.range-none
+    point: press.feedback
+    when: { type: [scroll, list, slider, input] }
+    value: none
+    because: 滚动、拖动和输入的节点没有点按反馈这回事
+  - id: press.fallback
+    point: press.feedback
+    when: {}
+    value: scale
+    because: 可点击的节点按下时缩小，反馈清楚且不依赖额外资产
+
+  # ---- hit.area：点击热区 ----
+  - id: hit.small-padded
+    point: hit.area
+    when: { touchSmall: true }
+    value: padded
+    because: 可见形状小于最小触控尺寸时，热区外扩到最小触控尺寸
+  - id: hit.fallback
+    point: hit.area
+    when: {}
+    value: visible
+    because: 可见形状已经够大时，热区就是可见形状
+
+  # ---- layout.anchor：锚定方式（相对父节点，贴近哪条边就锚哪条边） ----
+  - id: layout.anchor-fill
+    point: layout.anchor
+    when: { position: fill }
+    value: stretch
+    because: 铺满父节点的节点随父节点拉伸
+  - id: layout.anchor-top-left
+    point: layout.anchor
+    when: { position: top-left }
+    value: top-left
+    because: 贴近哪条边就锚哪条边
+  - id: layout.anchor-top
+    point: layout.anchor
+    when: { position: top }
+    value: top
+    because: 贴近哪条边就锚哪条边
+  - id: layout.anchor-top-right
+    point: layout.anchor
+    when: { position: top-right }
+    value: top-right
+    because: 贴近哪条边就锚哪条边
+  - id: layout.anchor-left
+    point: layout.anchor
+    when: { position: left }
+    value: left
+    because: 贴近哪条边就锚哪条边
+  - id: layout.anchor-center
+    point: layout.anchor
+    when: { position: center }
+    value: center
+    because: 不贴近任何一条边的节点锚在中心
+  - id: layout.anchor-right
+    point: layout.anchor
+    when: { position: right }
+    value: right
+    because: 贴近哪条边就锚哪条边
+  - id: layout.anchor-bottom-left
+    point: layout.anchor
+    when: { position: bottom-left }
+    value: bottom-left
+    because: 贴近哪条边就锚哪条边
+  - id: layout.anchor-bottom
+    point: layout.anchor
+    when: { position: bottom }
+    value: bottom
+    because: 贴近哪条边就锚哪条边
+  - id: layout.anchor-bottom-right
+    point: layout.anchor
+    when: { position: bottom-right }
+    value: bottom-right
+    because: 贴近哪条边就锚哪条边
+  - id: layout.anchor-fallback
+    point: layout.anchor
+    when: {}
+    value: top-left
+    because: 位置无法判断时锚在左上角，与引擎的默认一致
+
+  # ---- layout.flow：重复排列是否用自动布局 ----
+  - id: layout.flow-list
+    point: layout.flow
+    when: { type: [list, scroll] }
+    value: flow
+    because: 列表和滚动区的条目数量会变化，用自动布局排列
+  - id: layout.flow-even-varying
+    point: layout.flow
+    when: { childrenEven: true, varies: non-empty }
+    value: flow
+    because: 子节点等距排列且数量可能变化时用自动布局
+  - id: layout.flow-fallback
+    point: layout.flow
+    when: {}
+    value: absolute
+    because: 位置固定的子节点按绝对位置摆放
+
+  # ---- scale.source：分辨率不够时怎么办 ----
+  - id: scale.low-res-upscale
+    point: scale.source
+    when: { lowRes: true }
+    value: upscale
+    because: 源文件分辨率低于项目的设计分辨率时放大使用
+  - id: scale.fallback
+    point: scale.source
+    when: {}
+    value: native
+    because: 分辨率够用就按原样使用
+
+  # ---- atlas.group：资产归哪个图集 ----
+  - id: atlas.cross-screen-shared
+    point: atlas.group
+    when: { crossScreen: true }
+    value: shared
+    because: 被多个界面引用的资产放进共享图集，只存一份
+  - id: atlas.fallback
+    point: atlas.group
+    when: {}
+    value: screen
+    because: 只有本界面用到的资产放进本界面的图集
+
+  # ---- naming.node / naming.asset：命名模板 ----
+  - id: naming.node-fallback
+    point: naming.node
+    when: {}
+    value: "{prefix}_{semantic}_{index}"
+    because: 节点名由基元类型前缀、语义和序号组成，稳定且可读
+  - id: naming.asset-fallback
+    point: naming.asset
+    when: {}
+    value: "{prefix}_{semantic}_{index}"
+    because: 资产名由基元类型前缀、语义和序号组成，稳定且可读

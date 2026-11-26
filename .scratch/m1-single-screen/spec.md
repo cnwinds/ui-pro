@@ -1,6 +1,6 @@
 # M1 单界面闭环：第 2 批
 
-Status: ready-for-agent
+Status: resolved
 
 ## 目标
 
